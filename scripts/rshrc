@@ -1,0 +1,10 @@
+#
+# RSH rc script. Nothing really important needs to go in here...
+#
+
+a_variable=some_val
+
+# A command...
+echo Welcome to RSH
+
+
