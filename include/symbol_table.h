@@ -34,7 +34,7 @@ struct sym_table {
 int   symtable_init(int start_size);
 int   symtable_add(char *sym, char *data);
 char *symtable_get(char *sym);
-char *symtable_remove(char *sym);
+int   symtable_remove(char *sym);
 int   symtable_numeric(struct sym_entry **status, char **name, char **data);
 
 /* Some internal/book keeping functions. */

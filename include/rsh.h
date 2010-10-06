@@ -66,6 +66,7 @@ int  interactive_shell();
 int  script_shell();
 int  rsh_parse_args(int argc, char *argv[]);
 void rsh_init();
+void rsh_rc_init();
 
 int  run_script();
 int  run_interactive();
