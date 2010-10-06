@@ -8,12 +8,12 @@
  * dumb strcmp based table.
  */
 
+#include <rsh.h>
+#include <symbol_table.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include <rsh.h>
-#include <symbol_table.h>
 
 /*
  * The symbol table for the shell. Pretty useful, IMHO.

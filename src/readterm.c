@@ -20,13 +20,13 @@
  * list is pretty nifty IMHO.
  */
 
+#include <rsh.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <termios.h>
-
-#include <rsh.h>
 
 /* 
  * The history buffer's actual size is 1 larger than the desired history size.

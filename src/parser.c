@@ -3,13 +3,13 @@
  * oh well. Yacc didn't seem to have any way to do interactive stuff.
  */
 
-#include <string.h>
-#include <stdlib.h>
-
 #include <rsh.h>
 #include <lexxer.h>
 #include <parser.h>
 #include <symbol_table.h>
+
+#include <string.h>
+#include <stdlib.h>
 
 /* Table of string names of token types. The indices of this table correspond
  * to the values of the lexxer's defines. */

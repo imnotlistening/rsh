@@ -4,6 +4,12 @@
  * a login shell and just use stdin/stdout/stderr.
  */
 
+/* Shell includes */
+#include <rsh.h>
+#include <exec.h>
+#include <lexxer.h>
+#include <symbol_table.h>
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
@@ -13,12 +19,6 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-/* Shell includes */
-#include <rsh.h>
-#include <exec.h>
-#include <lexxer.h>
-#include <symbol_table.h>
 
 /* Global variables. Things like debug enable, etc. */
 int debug = 0;

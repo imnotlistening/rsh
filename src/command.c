@@ -7,18 +7,18 @@
  * the exec environment, and then hitting start (eh, well, sort of).
  */
 
-#include <fcntl.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
 #include <rsh.h>
 #include <exec.h>
 #include <parser.h>
 #include <lexxer.h>
 #include <builtin.h>
 #include <symbol_table.h>
+
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 int command_state = S_BASE;
 

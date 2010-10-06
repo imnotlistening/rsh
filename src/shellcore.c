@@ -2,14 +2,14 @@
  * Handles the execution of a script.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <rsh.h>
 #include <exec.h>
 #include <lexxer.h>
 #include <parser.h>
 #include <symbol_table.h>
+
+#include <stdio.h>
+#include <stdlib.h>
 
 /* External script variables. */
 extern char *script;

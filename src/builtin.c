@@ -8,16 +8,16 @@
  * structs look like.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-
 #include <rsh.h>
 #include <exec.h>
 #include <lexxer.h>
 #include <builtin.h>
 #include <symbol_table.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /* Prototypes for the builtins. */
 int builtin_cd(int argc, char **argv, int in, int out, int err);

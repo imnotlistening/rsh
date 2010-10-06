@@ -6,6 +6,12 @@
  * is in the right array. Anyway, go look at builtin.c.
  */
 
+#include <rsh.h>
+#include <exec.h>
+#include <lexxer.h>
+#include <builtin.h>
+#include <symbol_table.h>
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,12 +19,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include <rsh.h>
-#include <exec.h>
-#include <lexxer.h>
-#include <builtin.h>
-#include <symbol_table.h>
 
 /* 
  * We need these to save our state and restore our state after the source

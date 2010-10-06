@@ -8,6 +8,9 @@
  * That list can then be used for job control.
  */
 
+#include <rsh.h>
+#include <exec.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -16,9 +19,6 @@
 #include <termios.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-
-#include <rsh.h>
-#include <exec.h>
 
 extern int interactive;
 

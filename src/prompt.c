@@ -4,10 +4,10 @@
  * but not yet. For now this will remain really stupid.
  */
 
-#include <stdio.h>
-
 #include <rsh.h>
 #include <symbol_table.h>
+
+#include <stdio.h>
 
 void _display_user_name();
 void _display_mach_name();
