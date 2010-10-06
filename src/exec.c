@@ -204,7 +204,7 @@ int foreground(struct rsh_process *proc){
   } else if ( WIFSIGNALED(status) ){
 
     if ( interactive )
-      printf("\nProcess (%ld) terminated by signal.\n", proc->pid);
+      printf("\nProcess (%ld) terminated by signal.\n", (long)proc->pid);
     status = WEXITSTATUS(status);
     cleanup_proc(proc);
 
@@ -216,7 +216,7 @@ int foreground(struct rsh_process *proc){
       goto rewait;
     else
       printf("\nProcess (%ld) stopped [sig=%d].\n", 
-	     proc->pid, WSTOPSIG(status));
+	     (long)proc->pid, WSTOPSIG(status));
 
   } else {
 
@@ -541,7 +541,7 @@ void _display_proc(struct rsh_process *proc){
 
   printf("Process struct: (addr=%p)\n", proc);
   printf("  name: %s\n", proc->name);
-  printf("  pid: %ld\n", proc->pid);
+  printf("  pid: %ld\n", (long)proc->pid);
   printf("  stdin: %d\n", proc->stdin);
   printf("  stdout: %d\n", proc->stdout);
   printf("  stderr: %d\n", proc->stderr);
