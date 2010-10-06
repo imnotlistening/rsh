@@ -11,7 +11,7 @@ extern char *cur_token;
 
 %}
 
-WORD       [a-zA-Z0-9_\./\-!@%^()/\?~\+\[\]:]+
+WORD       [a-zA-Z0-9_\./\-!@%^()/\?~\+\[\]:,]+
 SYMBOL     \$[a-zA-Z0-9_]+
 SYMBOL2    \$\{[a-zA-Z0-9_]+\}
 

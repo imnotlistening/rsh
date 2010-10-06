@@ -9,6 +9,11 @@
 #include <rsh.h>
 #include <symbol_table.h>
 
+void _display_user_name();
+void _display_mach_name();
+void _display_dirn_name();
+
+
 /*
  * Just make sure the symbol table has the default prompt set up.
  */
@@ -50,6 +55,10 @@ void prompt_print(){
       case 'm': /* Machine name. */
 	break;
       case '1': /* The directory name that you are in. ~ = $HOME */
+	break;
+      case 'h':
+	break;
+      case 'H':
 	break;
       }
 

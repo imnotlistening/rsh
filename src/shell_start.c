@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -28,6 +29,9 @@ int interactive = 0;
  * out by the arg parsing routines. */
 char *script = NULL;
 char **script_argv;
+
+/* Function to source the init scripts. */
+extern int builtin_source(int argc, char **argv, int in, int out, int err);
 
 /* Options understood by the shell. */
 static struct option options[] = {
@@ -55,7 +59,8 @@ int rsh_main(int argc, char **argv){
   /* Set up terminal attributes, ignore some sigs, etc. */
   rsh_init();
 
-  /* Handle calling the initialization scripts (~/.rshrc & ~/.profile) */
+  /* Handle calling the initialization scripts (~/.rshrc) */
+  rsh_rc_init();
 
   /* If we are an interactive shell then go to interactive mode. */
   if ( interactive )
@@ -175,5 +180,33 @@ void rsh_init(){
 
   /* Initialize the default prompt. */
   prompt_init();
+
+}
+
+void rsh_rc_init(){
+
+  /* See if $HOME/.rshrc exists. */
+  int len, _argc;
+  char *home;
+  char *rc = "/.rshrc"; /* Make sure we have a path delimiter... */
+  char *rc_script;
+  char *_argv[3]; /* As in 'source' '$HOME/.rshrc' NULL */
+
+  home = getenv("HOME");
+  len = strlen(home) + strlen(rc) + 1;
+
+  rc_script = (char *)malloc(len);
+  if ( ! rc_script )
+    return;
+
+  strcpy(rc_script, home);
+  strcat(rc_script, rc);
+  printf("Loading: '%s'\n", rc_script);
+
+  _argc = 2; /* As in 'source $HOME/.rshrc' */
+  _argv[0] = "source";
+  _argv[1] = rc_script;
+  _argv[2] = NULL;
+  builtin_source(_argc, _argv, 0, 1, 2);
 
 }
