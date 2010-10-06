@@ -17,6 +17,7 @@
 #include <exec.h>
 #include <lexxer.h>
 #include <builtin.h>
+#include <symbol_table.h>
 
 /* Prototypes for the builtins. */
 int builtin_cd(int argc, char **argv, int in, int out, int err);
@@ -39,11 +40,12 @@ struct builtin builtins[] = {
   {"cd", builtin_cd},
   {"exec", builtin_exec},
   {"history", builtin_history},
-  {"hstack", builtin_hstack},
+/*{"hstack", builtin_hstack}, */ /* This was for debugging. */
   {"fg", builtin_fg},
   {"bg", builtin_bg},
   {"dproc", builtin_dproc},
   {"source", builtin_source},
+  {"export", builtin_export},
   {NULL, NULL}, /* Null terminate the table. */
 
 };
@@ -108,6 +110,11 @@ int builtin_cd(int argc, char **argv, int in, int out, int err){
 }
 
 int builtin_exec(int argc, char **argv, int in, int out, int err){
+
+  /*
+   * Make an exec syscall. Most shells really just use this for doing fd
+   * manipulation. Not implemented yet.
+   */
 
   return 0;
 
@@ -223,3 +230,27 @@ int builtin_dproc(int argc, char **argv, int in, int out, int err){
 
 }
 
+/*
+ * Export a variable in our symbol table to the environment. 
+ */
+int builtin_export(int argc, char **argv, int in, int out, int err){
+
+  char *symdata;
+
+  /* Ignore the name of the command. */
+  argc--;
+  argv++;
+
+  /* Now attempt to export each passed argument. */
+  while ( *argv ){
+
+    symdata = symtable_get(*argv);
+    setenv(*argv, symdata, 1);
+
+    argv++;
+
+  }
+
+  return RSH_OK;
+
+}

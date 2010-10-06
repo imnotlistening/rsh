@@ -21,7 +21,8 @@ void prompt_init(){
 /*
  * Print the contents of $PROMPT. Maybe $PROMPT will be able to contain clever
  * escape sequences some day, but for now, it just prints the prompt character
- * by character.
+ * by character. OK, now some escapes are implemented via the '%' character.
+ * For instance, %n evaluates to the user name that the shell is running under.
  */
 void prompt_print(){
 
@@ -33,7 +34,35 @@ void prompt_print(){
     return;
   }
 
+  while ( *prompt ){
+
+    /* We must print our character. */
+    if ( *prompt == '%' ){
+
+      prompt++;
+      switch ( *prompt ){
+
+      case '%': /* Just print a '%' character. */
+	putchar('%');
+	break;
+      case 'n': /* User name. */
+	break;
+      case 'm': /* Machine name. */
+	break;
+      case '1': /* The directory name that you are in. ~ = $HOME */
+	break;
+      }
+
+    } else {
+      /* Otherwise, just print the character. */
+      putchar(*prompt);
+    }
+
+    prompt++;
+
+  }
   printf("%s", prompt);
   fflush(stdout);
 
 }
+

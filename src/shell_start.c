@@ -55,6 +55,8 @@ int rsh_main(int argc, char **argv){
   /* Set up terminal attributes, ignore some sigs, etc. */
   rsh_init();
 
+  /* Handle calling the initialization scripts (~/.rshrc & ~/.profile) */
+
   /* If we are an interactive shell then go to interactive mode. */
   if ( interactive )
     status = interactive_shell();

@@ -64,6 +64,38 @@ int main(){
     printf("%s -> %s\n", name, value);
   }
 
+  printf("--------------------\n");
+
+  symtable_remove("0");
+  symtable_remove("1");
+  symtable_remove("2");
+  symtable_remove("3");
+  symtable_remove("8");
+  symtable_remove("sym1");
+  symtable_remove("sym2");
+  symtable_remove("sym3");
+  symtable_remove("sym8");
+  symtable_remove("symsymsym");
+  symtable_remove("bkfhd");
+
+  symtable_add("BLAH", "hello");
+  symtable_add("37", "a_script");
+  //symtable_add("38", "a_script");
+
+  printf("Symtable:\n");
+  _symtable_display();
+  printf("--\n");
+  
+  status = NULL;
+  while ( symtable_numeric(&status, &name, &value) ){
+    printf(": %s -> %s\n", name, value);
+  }
+
+  status = NULL;
+  while ( symtable_numeric(&status, &name, &value) ){
+    printf(": %s -> %s\n", name, value);
+  }
+
   return 0;
 
 }

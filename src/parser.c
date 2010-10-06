@@ -28,14 +28,16 @@ char *lexxer_tokens[] = {
   "GLOB",
   "REDIRECT_IN",
   "REDIRECT_OUT",
+  "REDIRECT_ERR",
   "APPEND_OUT",
+  "APPEND_ERR",
   "PIPE",
   "WHITESPACE",
   "COMMENT",
   "EOFTOKEN",
   "BACKGROUND",
   "ESCAPESEQ",
-  "ARG_EXP",
+  "SYMARGS",
 
 };
 
@@ -130,7 +132,7 @@ struct rsh_token *preparse(struct rsh_token *tokens){
   struct rsh_token tmp;
   struct rsh_token numeric_var;
   struct rsh_token *new_seq = NULL;
-  struct sym_entry *status = NULL;
+  struct sym_entry *status;
   char *name, *data;
   int seq_len = token_seqlen(tokens);
   int tokind = 0;
@@ -144,7 +146,6 @@ struct rsh_token *preparse(struct rsh_token *tokens){
   
   while ( tokind < seq_len){
 
-    //printf("Parsing token type: %s\n", stringify_token(tokens[tokind].type));
     switch (tokens[tokind].type){
 
       /*
@@ -399,8 +400,10 @@ struct rsh_token *preparse(struct rsh_token *tokens){
 
       /* Ignore the $0 variable. */
       status = NULL;
+      name = NULL;
+      data = NULL;
       symtable_numeric(&status, &name, &data);
-      
+
       tmp.tok = " ";
       tmp.type = WHITESPACE;
 

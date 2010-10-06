@@ -102,7 +102,7 @@ char *symtable_get(char *sym){
  *   struct sym_entry *ent = NULL;
  *   char *name;
  *   char *val;
- *   while ( (ent = symtable_get_next_numeric(&ent, &name, &val)) != NULL )
+ *   while ( symtable_numeric(&ent, &name, &val) )
  *     // Do stuff.
  *
  * This function returns the value of the symbol, not the name. You will have
@@ -128,6 +128,11 @@ int symtable_numeric(struct sym_entry **status, char **name, char **data){
     if ( *end ){
       /* Not a numeric symbol. Try the next one. */
       *status = (*status)->next;
+
+      /* Check if we are done. */
+      if ( ! *status )
+	done = 1;
+
       continue;
     }
 
@@ -147,6 +152,65 @@ int symtable_numeric(struct sym_entry **status, char **name, char **data){
   /* If we are here, we have found all of the numeric symbols. Just return a
    * 0 to signify this. */
   return 0;
+
+}
+
+/*
+ * Remove a symbol from the symbol table (or environment).
+ */
+int symtable_remove(char *sym){
+
+  char *env_sym;
+  struct sym_entry *ent;
+  struct sym_entry *prev;
+
+  env_sym = getenv(sym);
+  if ( env_sym ){
+    return unsetenv(sym);    
+  }
+
+  /* Empty symbol table. */
+  if ( ! table.tbl_entries )
+    return RSH_OK;
+  
+  /* Otherwise we must delve into our symbol table. First check the caches. */
+  if ( table.cach_add )
+    if ( strcmp(sym, table.cach_add->name) == 0 )
+      table.cach_add = NULL;
+
+  if ( table.cach_get )
+    if ( strcmp(sym, table.cach_get->name) == 0 )
+      table.cach_get = NULL;
+
+  /* Special case if the entry is the first in the list. */
+  if ( strcmp(table.tbl_entries->name, sym) == 0 ){
+    ent = table.tbl_entries;
+    table.tbl_entries = ent->next;
+    goto cleanup;
+  }
+
+  /* Now actually find the elem in the list, delete it, and free() it. */
+  ent = table.tbl_entries->next;
+  prev = table.tbl_entries;
+  for ( ; ent != NULL; ent = ent->next){
+    if ( strcmp(ent->name, sym) == 0 )
+      break;
+    prev = ent;
+  }
+
+  /* Free up the memory of the entity in question (if its not null) */
+  if ( ! ent )
+    return RSH_OK;
+
+  prev->next = ent->next;
+
+  /* Cleanup. */
+ cleanup:
+  free(ent->name);
+  free(ent->data);
+  free(ent);
+
+  return RSH_OK;
 
 }
 
@@ -197,6 +261,7 @@ struct sym_entry *_symtable_get_entry(char *sym){
 
   entry->name = strdup(sym);
   entry->data = NULL;
+  entry->next = NULL;
 
   table.entries++;
 
