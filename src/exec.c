@@ -20,6 +20,13 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+/* 
+ * I *hate* solaris.  WHICH BRILLIANT GENIOUS decided to make stdin a macro?
+ * I mean really, was it really so hard to think about possible consequences?
+ * Screw you solaris developers. Screw you.
+ */
+#undef stdin
+
 extern int interactive;
 
 extern char *script;
