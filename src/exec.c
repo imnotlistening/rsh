@@ -26,6 +26,8 @@
  * Screw you solaris developers. Screw you.
  */
 #undef stdin
+#undef stdout
+#undef stderr
 
 extern int interactive;
 
@@ -299,7 +301,7 @@ int _child_exec(struct rsh_process *proc){
   fsync(STDOUT_FILENO);
   err = execvp(proc->command, proc->argv);
   if ( err ){
-    fprintf(stderr, "exec '%s", proc->command);
+    printf("exec '%s", proc->command);
     perror("'");
   }
   exit(1);
