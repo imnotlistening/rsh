@@ -301,8 +301,7 @@ int _child_exec(struct rsh_process *proc){
   fsync(STDOUT_FILENO);
   err = execvp(proc->command, proc->argv);
   if ( err ){
-    printf("exec '%s", proc->command);
-    perror("'");
+    perror("exec");
   }
   exit(1);
 
