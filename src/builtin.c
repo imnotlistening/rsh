@@ -221,7 +221,7 @@ int builtin_dproc(int argc, char **argv, int in, int out, int err){
   
   while ( (proc = get_next_proc(&state)) != NULL ){
 
-    printf("pid %-5d (%s): %s\n", proc->pid, 
+    printf("pid %-5ld (%s): %s\n", (long)proc->pid, 
 	   proc->running ? "running" : "stopped", proc->name);
 
   }
