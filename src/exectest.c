@@ -2,6 +2,8 @@
  * Test out the rsh_exec() functionality.
  */
 
+#include <exec.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -9,8 +11,6 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-
-#include <exec.h>
 
 void sig_handler(int sig);
 
