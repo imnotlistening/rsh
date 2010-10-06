@@ -49,7 +49,7 @@ int main(){
   printf("returned status: %d\n", status);
   if ( WIFSTOPPED(status) ){
     printf("Process was stopped, starting in a second...\n");
-    printf("  current pgrp: %d\n", tcgetpgrp(0));
+    printf("  current pgrp: %ld\n", (long)tcgetpgrp(0));
     sleep(1);
     while ( (tmp = get_next_proc(&state)) != NULL ){
       /* Try and foreground the process. */
