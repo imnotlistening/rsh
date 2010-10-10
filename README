@@ -231,6 +231,7 @@ symbol can be used later on like so:
 
     [rsh]$ echo $PROMPT
     [rsh]$ 
+    [rsh]$ 
     
 Again this is just typical shell behavior. However, some more complex examples
 will not work the way you expect them to. For instance:
@@ -278,3 +279,104 @@ This will not work the way you expect it to. Instead:
     [rsh]$ BLAH="hello world"
     [rsh]$ export BLAH
 
+7. Random other stuff.
+
+    A. Builtins.
+
+        There are several built in functions that you can use. These are:
+	
+	    cd
+	    exit
+	    exec
+	    history
+	    fg
+	    bg
+	    dproc
+	    export
+
+        Most of these work as they would under a normal shell. The exceptions
+	are 'exec' and 'dproc'. Exec is not implemented yet at all and, when
+	implemented, will not be able to do shell file descriptor manipulation.
+	dproc is used to display processes that the shell is aware of and their
+	state. This is slightly different functionality than the default
+	behavior of `ps'.
+
+	Built in functions are mostly implemented in src/builtin.c. Each built
+	in function must match the prototype in defined in the builtin struct:
+	
+	    typedef int (* builtin_func)(int argc, char **argv, 
+	    	    	   		 int in, int out, int err);
+	    struct builtin {
+
+  	        char *name;
+		builtin_func func;
+
+	    };
+
+        Each built in function is then also placed in the 
+
+	    struct builtin builtins[];
+
+	array. This facilitates looking up built in functions by checking a
+	command against the list of built in functions in the builtins[] array.
+	This can lead to over head if a huge number of built in functions were
+	to be defined but that doesn't seem like a big enough problem to
+	warrent making a hashtable of built ins.
+
+    B. PROMPT Variable.
+
+        Like any shell, the prompt is customizable. The prompt for RSH is not
+	nearly as customizable as the prompt for a real shell, but I am working
+	on making as much as I can. Look at src/prompt.c for more information
+	on how to define a prompt. Simple overview: define it like you would
+	in bash, but look at src/prompt.c to see what escapes I have actually
+	implemented and what they escapes are. I tried to keep them close to
+	bash syntax, but I did make some changes.
+
+    C. Solaris Sucks.
+    
+        Apparently the developers of the Solaris C API decided that it would
+	be a good idea to have stdin, stderr, and stdout be defined as macros.
+	These macros exapnd to some array reference which I presume contains
+	the value of the FILE data structure that you want to use when doing
+	fprintf(). This makes any code like this a pain in the ass:
+
+	    struct rsh_process proc;
+	    proc.stdin  = 0;
+	    proc.stdout = 1;
+	    proc.stderr = 2;
+
+	This leads to compile errors. So yeah, I hate Solaris now.
+
+    D. Initialization Files.
+
+        If you wish, you can make an RC file for RSH. RSH looks for ~/.rshrc
+	and sources it. Don't just use your ~/.bashrc file or the like since
+	bash syntax will make RSH cry. Primarily things like if clauses and
+	for loops and name globbing will just not work and you will be very
+	unhappy about the results. On the other hand you can set up changes
+	to your path variable or maybe set JAVA_HOME or whatever else you want
+	to do. For the most part you wont need anything since almost everything
+	of relevance will be handled by the login shell (presumably bash) and
+	RSH will just get the results in the environment.
+
+    E. CTRL-c
+
+        CTRL-c when in RSH will display the history. However, child processes
+	have their signal handlers reset so that CTRL-c works as expected for
+	an errant child.
+
+    F. File redirection.
+
+        File redirection works. Well, it works so far as I have tested it.
+	
+	    echo HELLO WORLD > tmp.txt
+
+	will do as you expect. Likewise with stderr. Redirection does not work
+	for higher file descriptors; my lexxer is not smart enough at the
+	to figure that out. It would be implementable, but that would warrent
+	a complete reimplementation of the parser, which would be really really
+	time consuming. Piping as of now has not been implemented though should
+	actually be pretty easy; just needs the code to be written.
+
+    G. 

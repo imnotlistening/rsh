@@ -74,6 +74,7 @@ int dispatch_process(int background){
 int rsh_command(struct rsh_token *seq){
 
   int ret;
+  int pipe_fds[2];
 
   clear_argv();
 
@@ -210,7 +211,54 @@ int rsh_command(struct rsh_token *seq){
        * Pipe the previous commands output to the next commands input.
        */
     case PIPE:
-      printf("Piping coming soon.\n");
+      /* Some error checking. */
+      if ( (seq+1)->type == NULL_LEX ){
+	printf("Missing read half of pipe command.\n");
+	return RSH_ERR;
+      }
+
+      /* First make the pipe. */
+      ret = pipe(pipe_fds);
+      if ( ret < 0 ){
+	perror("pipe");
+	return RSH_ERR;
+      }
+
+      /* Now we pipe stdout of the current command to where ever... */
+      proc_stdout = pipe_fds[1];
+      
+      /* Dispatch the process... and get ready for the next. */
+      dispatch_process(1);
+      clear_argv();
+
+      /* Set up the other half of the pipe for the next process. */
+      proc_stdin = pipe_fds[0];
+      break;
+
+    case PIPE_ERR:
+      /* Some error checking. */
+      if ( (seq+1)->type == NULL_LEX ){
+	printf("Missing read half of pipe command.\n");
+	return RSH_ERR;
+      }
+
+      /* First make the pipe. */
+      ret = pipe(pipe_fds);
+      if ( ret < 0 ){
+	perror("pipe");
+	return RSH_ERR;
+      }
+
+      /* Now we pipe stdout of the current command to where ever... */
+      proc_stdout = pipe_fds[1];
+      
+      /* Dispatch the process, and get ready for the next. */
+      dispatch_process(1);
+      clear_argv();
+
+      /* Set up the other half of the pipe for the next process. */
+      proc_stdin = pipe_fds[0];
+      break;
 
     case BACKGROUND:
       dispatch_process(1);
@@ -315,6 +363,7 @@ int set_stdin(char *file){
   proc_stdin = fd;
 
   printf("Set new stdin fd: %d\n", proc_stdin);
+  rsh_register_fd(proc_stdin);
   return RSH_OK;
 
 }
@@ -340,6 +389,7 @@ int set_stdout(char *file, int append){
   proc_stdout = fd;
 
   printf("Set new stdout fd: %d -> %s\n", proc_stdout, file);
+  rsh_register_fd(proc_stdout);
   return RSH_OK;
 
 }
@@ -365,6 +415,7 @@ int set_stderr(char *file, int append){
   proc_stderr = fd;
 
   printf("Set new stderr fd: %d\n", proc_stderr);
+  rsh_register_fd(proc_stderr);
   return RSH_OK;
 
 }

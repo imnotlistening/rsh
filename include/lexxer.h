@@ -20,12 +20,13 @@
 #define APPEND_OUT     14  /* Post preprocces */
 #define APPEND_ERR     15  /* Post preprocces */
 #define PIPE           16  /* Post preprocces */
-#define WHITESPACE     17  /* Post preprocces */
-#define COMMENT        18
-#define EOFTOKEN       19
-#define BACKGROUND     20  /* Post preprocces */
-#define ESCAPESEQ      21  /* Post preprocces */
-#define SYMARGS        22  
+#define PIPE_ERR       17
+#define WHITESPACE     18  /* Post preprocces */
+#define COMMENT        19
+#define EOFTOKEN       20
+#define BACKGROUND     21  /* Post preprocces */
+#define ESCAPESEQ      22  /* Post preprocces */
+#define SYMARGS        23  
 
 #include <stdio.h>
 

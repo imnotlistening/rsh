@@ -16,6 +16,7 @@ extern char *script;
 extern char **script_argv;
 
 extern int yylex();
+extern void check_processes();
 
 int run_script(){
 
@@ -58,16 +59,24 @@ int run_interactive(){
     prompt_print();
     tokens = read_next_statement();
     if ( ! tokens )
-      continue;
+      break;
 
     /* Run the command. */
     exec_token_seq(tokens);
 
-    /* Do process book keeping. */
-    check_processes();
-
   } while (1);
 
   return 0;
+
+}
+
+/*
+ * This should be called whenever a child dies... This allows us to do
+ * asynchronous cleanup of the process structure of the terminated child.
+ */
+void sigchld_handler(int sig){
+
+  check_processes();
+  //printf("Got a sigchld\n");
 
 }

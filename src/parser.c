@@ -32,6 +32,7 @@ char *lexxer_tokens[] = {
   "APPEND_OUT",
   "APPEND_ERR",
   "PIPE",
+  "PIPE_ERR",
   "WHITESPACE",
   "COMMENT",
   "EOFTOKEN",
@@ -192,7 +193,8 @@ struct rsh_token *preparse(struct rsh_token *tokens){
     case BACKTICK:
       if ( backticks )
 	backticks = 0;
-        /* Exec the command enclosed and interpolate its output. */
+        /* Exec the command enclosed and interpolate its output. Lol, thats
+	 * harder than it sounds... */
       else
 	backticks = STATE_BT;
       break;
@@ -356,6 +358,16 @@ struct rsh_token *preparse(struct rsh_token *tokens){
       } else {
 	tmp.type = WORD;
 	tmp.tok  = "|";
+	_append_to_tokseq(new_seq, &size, &tmp);
+      }
+      break;
+    case PIPE_ERR:
+      /* Not in quotes. */
+      if ( state != STATE_SQ && state != STATE_DQ ){
+	token_add(&new_seq, &size, &(tokens[tokind]));
+      } else {
+	tmp.type = WORD;
+	tmp.tok  = "2|";
 	_append_to_tokseq(new_seq, &size, &tmp);
       }
       break;
@@ -709,6 +721,9 @@ void _print_command(struct rsh_token *tokens){
       break;
     case PIPE:
       printf("'|' ");
+      break;
+    case PIPE_ERR:
+      printf("'2|' ");
       break;
     case WHITESPACE:
       printf("' ' ");

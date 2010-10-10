@@ -46,6 +46,13 @@ static struct rsh_process_group rsh_pgroup;
 static struct termios defaults;
 
 /*
+ * This is used to make sure the unnecessary ends of a pipe are closed by both
+ * the child and the parent.
+ */
+int rsh_pipe[2];
+int pipe_used = 0;
+
+/*
  * Initialize the process group for the shell. This should only be called once.
  */
 int init_rsh_pgroup(int procs){
@@ -110,6 +117,19 @@ void save_default_term_settings(){
 
   tcgetattr(STDIN_FILENO, &defaults);
   
+}
+
+/*
+ * Register a pipe, this pipe will then be properly handled by the rsh_exec()
+ * code.
+ */
+void rsh_register_pipe(int pip[2]){
+
+  rsh_pipe[0] = pip[0];
+  rsh_pipe[1] = pip[1];
+
+  pipe_used = 1;
+
 }
 
 /*
@@ -235,15 +255,22 @@ int foreground(struct rsh_process *proc){
 
 /*
  * This is called by the parent of the forked process. It will figure out what
- * to do about background vs foreground stuff, signal handling, etc.
+ * to do about background vs foreground stuff, pipe handling, etc.
  */
 int _parent_exec(struct rsh_process *proc){
 
   int status = -1;
 
-  //printf("New child process: %d\n", proc->pid);
   if ( interactive )
     setpgid(proc->pid, proc->pgid);
+
+  if ( proc->pipe_used ){
+    if ( proc->pipe_lane == STDIN_FILENO )
+      close(proc->pipe[1]);
+    else if ( proc->pipe_lane == STDOUT_FILENO || 
+	      proc->pipe_lane == STDERR_FILENO )
+      close(proc->pipe[0]);
+  }
 
   /* Now based on whether we are an interactive shell and whether the job
    * should be back grounded we either wait or return immediatly. */
@@ -272,6 +299,20 @@ int _child_exec(struct rsh_process *proc){
   if ( interactive )
     setpgid(proc->pid, proc->pgid);
   
+  if ( proc->pipe_used ){
+
+    /* If this pipe is for stdin, then we are reading from the pipe, and as
+     * such we do not need the write end. So close it. If this pipe is for
+     * stdout or stderr, then we don't need the read end, so close it. */
+    if ( proc->pipe_lane == STDIN_FILENO )
+      close(proc->pipe[1]);
+    else if ( proc->pipe_lane == STDOUT_FILENO || 
+	      proc->pipe_lane == STDERR_FILENO )
+      close(proc->pipe[0]);
+    /* Else: ??? bug... */
+
+  }
+
   /* Now make the stdin, stderr, stdout file descriptors work. Do this after
    * we foreground or w/e. */
   if ( dup2(proc->stdin, STDIN_FILENO) < 0 ){
@@ -359,12 +400,9 @@ int _do_rsh_exec(struct rsh_process *proc){
  * return.
  */
 int rsh_exec(char *command, int argc, char *argv[], int stdin, int stdout,
-	     int stderr, int background){
+	     int stderr, int background, int pipe_type, int pipe[2]){
 
   struct rsh_process *proc;
-
-  //printf("Executing: %s (background=%s) %d|%d|%d\n", command, 
-	 //background ? "yes" : "no", stdin, stdout, stderr);
 
   /* Get an available struct rsh_process from the table of processes. */
   proc = get_empty_process();
@@ -381,6 +419,25 @@ int rsh_exec(char *command, int argc, char *argv[], int stdin, int stdout,
   proc->argv = argv;
   proc->argc = argc;
   proc->background = background;
+  
+  if ( pipe_type == RSH_PIPE_IN ){
+    proc->pipe_used = 1;
+    proc->pipe_lane = STDIN_FILENO;
+    proc->pipe[0] = pipe[0];
+    proc->pipe[0] = pipe[0];
+  }
+  if ( pipe_type == RSH_PIPE_OUT ){
+    proc->pipe_used = 1;
+    proc->pipe_lane = STDOUT_FILENO;
+    proc->pipe[0] = pipe[0];
+    proc->pipe[0] = pipe[0];
+  }
+  if ( pipe_type == RSH_PIPE_ERR ){
+    proc->pipe_used = 1;
+    proc->pipe_lane = STDERR_FILENO;
+    proc->pipe[0] = pipe[0];
+    proc->pipe[0] = pipe[0];
+  }
 
   return _do_rsh_exec(proc);
 
@@ -469,6 +526,13 @@ struct rsh_process *get_next_proc(int *state){
 void cleanup_proc(struct rsh_process *proc){
 
   int i;
+  char _eof = 0x04;
+
+  /* Close the processes pipe streams if necessary. */
+  if ( proc->pipe_used ){
+    close(proc->pipe[0]);
+    close(proc->pipe[1]);
+  }
 
   /* Release the process structure's memory. */
   free(proc);
@@ -501,35 +565,33 @@ void check_processes(){
     if ( proc->pid == rsh_pgroup.pid )
       continue;
 
+    /* Don't check foreground processes either, those are dealt with by the
+     * foreground() function. */
+    if ( ! proc->background )
+      continue;
+
+    printf("waitpit: %d\n", proc->pid);
     ret = waitpid(proc->pid, &status, WNOHANG|WUNTRACED);
     if ( ret == 0 )
       continue;
 
     if ( ret < 0 ){
-      perror("waitpid()");
       continue;
     }
 
     /* Here we actually have a change in the process' state. */
     if ( WIFEXITED(status) ){
 
-      if ( interactive )
-	printf("+ done              %s\n", proc->name);
-
       cleanup_proc(proc);
 
     } else if ( WIFSIGNALED(status) ){
       
-      if ( interactive )
-	printf("+ signaled (%2d)   %s\n", WTERMSIG(status), proc->name);
-
       cleanup_proc(proc);
 
     } else if ( WIFSTOPPED(status) ){
-      
-      printf("+ stopped             %s\n", proc->name);
-      proc->running = 0;
 
+      proc->running = 0;
+ 
     } /* Else do nothing. */
 
   }

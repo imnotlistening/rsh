@@ -33,6 +33,9 @@ char **script_argv;
 /* Function to source the init scripts. */
 extern int builtin_source(int argc, char **argv, int in, int out, int err);
 
+/* SIGCHLD handler. This guy is pretty important. */
+void sigchld_handler(int sig);
+
 /* Options understood by the shell. */
 static struct option options[] = {
 
@@ -121,7 +124,6 @@ int rsh_parse_args(int argc, char **argv){
 
 int interactive_shell(){
 
-  printf("Running interactive RSH shell.\n");
   run_interactive();
 
   return 0;
@@ -155,7 +157,7 @@ void rsh_init(){
     signal(SIGTSTP, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
     signal(SIGTTOU, SIG_IGN);
-    //signal(SIGCHLD, SIG_IGN);
+    signal(SIGCHLD, sigchld_handler);
   }
 
   /* Set up the default environment, symbol table, etc. */
@@ -191,6 +193,7 @@ void rsh_rc_init(){
   char *rc = "/.rshrc"; /* Make sure we have a path delimiter... */
   char *rc_script;
   char *_argv[3]; /* As in 'source' '$HOME/.rshrc' NULL */
+  struct stat sbuf;
 
   home = getenv("HOME");
   len = strlen(home) + strlen(rc) + 1;
@@ -201,6 +204,13 @@ void rsh_rc_init(){
 
   strcpy(rc_script, home);
   strcat(rc_script, rc);
+
+  /* See if the file exists and is accessable, etc, etc. If not fail 
+   * silently. */
+  if ( stat(rc_script, &sbuf) < 0)
+    return;
+  
+
   printf("Loading: '%s'\n", rc_script);
 
   _argc = 2; /* As in 'source $HOME/.rshrc' */

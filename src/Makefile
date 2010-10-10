@@ -1,23 +1,23 @@
-
 #
-# Build my RIT Shell.
+# Build my RIT Shell (RSH).
 #
 
 CC       = gcc
-LD       = gcc # Makes life easier :).
+LD       = gcc          # Makes life easier :).
 CFLAGS   = -Wall -ggdb 
 CPPFLAGS = -I../include #-D_HAVE_GNU_READLINE
 LDFLAGS  =
 LIBS     = -L../libs -lreadline -lhistory
 
 OBJECTS  = lexxer.o shell_start.o parser.o shellcore.o symbol_table.o exec.o \
-		command.o readterm.o prompt.o builtin.o source.o
+		command.o readterm.o prompt.o builtin.o source.o rsh_fd.o
 TESTS    = more_tests symtest exectest termtest
 
 all: rsh $(TESTS)
 
 #
-# Configure readline.
+# Configure readline. To use these targets extract a gnu-term-readline dist
+# into the source directory.
 config-readline:
 	if [ ! -e .readline_configed ]; then \
 		cd readline-6.1 && ./configure; \
@@ -66,5 +66,7 @@ clean:
 	rm -f $(OBJECTS) lex.yy.c y.tab.c rsh $(TESTS)
 
 clean-all: clean
-	rm .readline_configed
-	cd readline-6.1 && make distclean
+	rm -f .readline_configed
+	if [ -d readline-6.1 ]; then \
+		cd readline-6.1 && make distclean ; \
+	fi

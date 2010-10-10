@@ -59,8 +59,21 @@ struct rsh_history_stack {
 
 };
 
+struct file_descriptors {
+
+  /* List of file descriptors. */
+  int *fds;
+  
+  /* Length of fd array. */
+  int length;
+
+  /* Index of next place to insert a fd. */
+  int offset;
+
+};
+
 /*
- * These are useful functions.
+ * These are useful functions. Very informative, I know.
  */
 int  interactive_shell();
 int  script_shell();
@@ -96,6 +109,10 @@ int  rsh_stack_pop(struct rsh_history_stack *stack);
 
 void prompt_init();
 void prompt_print();
+
+void rsh_init_fds();
+int  rsh_register_fd(int fd);
+void rsh_close_fds();
 
 /* Macros. */
 #define STACK_ITER(elem) (elem = elem->next)

@@ -39,6 +39,7 @@ SYMBOL2    \$\{[a-zA-Z0-9_]+\}
 \>               return REDIRECT_OUT;
 2\>              return REDIRECT_ERR;
 \|               return PIPE;
+2\|              return PIPE_ERR;
 \&               return BACKGROUND;
 \#               BEGIN(comment); return COMMENT;
 \\.              return ESCAPESEQ;
