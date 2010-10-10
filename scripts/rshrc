@@ -1,0 +1,11 @@
+# RSH rc script. Lol.
+
+# No ~ expansion yet :(. But this is still useful.
+PATH=$PATH:$HOME/bin
+
+# Just because this is for testing purposes, let everyone know we are alive.
+echo "Welcome to RSH"
+
+# Since we are probably not a login shell (I pity the fool) we really don't
+# have to do much else since everything will have been handled by the login 
+# shell (bash, zsh, etc).
