@@ -8,6 +8,10 @@
 # Main target.
 all:
 	cd src && make
+	cp src/rsh .
+	if [ ! -e os1shell ]; then \
+		ln -s rsh os1shell; \
+	fi
 
 # This target builds RSH with GNU readline instead of my readline. This is for
 # a much more robust and fully featured readline library. On the other hand I
@@ -18,6 +22,8 @@ all_gnu_rl:
 
 clean:
 	cd src && make clean
+	rm -f rsh os1shell
 
 distclean:
 	cd src && make clean-all
+	rm -f rsh os1shell
