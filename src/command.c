@@ -32,6 +32,20 @@ int max_argc = 0;
 /* Base I/O descriptors for each dispatched process. */
 int proc_stdin = 0, proc_stdout = 1, proc_stderr = 2;
 
+/* 
+ * Pipe status: if this is not set and we are looking to dispatch a command, no
+ * pipe was used, if this is set, the the previous command is piping output to
+ * the current commands input. If this is not set and there is a pipe request,
+ * then set this variable.
+ */
+int pipe_status = 0;
+
+/*
+ * The pipe itself.
+ */
+int pipe_fds[2];
+
+
 /**
  * Dispatch a process via rsh_exec(). This will either background or foreground
  * the new process based on 'interactive'.
@@ -55,7 +69,8 @@ int dispatch_process(int background){
   //handle_aliases()... Or something.
 
   status = rsh_exec(command, argc, argv, 
-		    proc_stdin, proc_stdout, proc_stderr, background);
+		    proc_stdin, proc_stdout, proc_stderr, background,
+		    pipe_status, pipe_fds);
   clear_argv();
   return status;
 
@@ -74,7 +89,6 @@ int dispatch_process(int background){
 int rsh_command(struct rsh_token *seq){
 
   int ret;
-  int pipe_fds[2];
 
   clear_argv();
 
@@ -226,6 +240,9 @@ int rsh_command(struct rsh_token *seq){
 
       /* Now we pipe stdout of the current command to where ever... */
       proc_stdout = pipe_fds[1];
+ 
+      /* Set the pipe status. */
+      pipe_status |= RSH_PIPE_OUT;
       
       /* Dispatch the process... and get ready for the next. */
       dispatch_process(1);
@@ -252,6 +269,9 @@ int rsh_command(struct rsh_token *seq){
       /* Now we pipe stdout of the current command to where ever... */
       proc_stdout = pipe_fds[1];
       
+      /* Set pipe status */
+      pipe_status |= RSH_PIPE_ERR;
+
       /* Dispatch the process, and get ready for the next. */
       dispatch_process(1);
       clear_argv();
@@ -261,8 +281,22 @@ int rsh_command(struct rsh_token *seq){
       break;
 
     case BACKGROUND:
+
+      /* 
+       * Handle the pipe status. If this is set to out, its a left over from
+       * the previous process and should actually be set to RSH_PIPE_IN because
+       * we expect to receive input for this processes from the previous
+       * process.
+       */
+      if ( pipe_status & (RSH_PIPE_OUT|RSH_PIPE_ERR) )
+	pipe_status = RSH_PIPE_IN;
+
       dispatch_process(1);
       clear_argv();
+
+      /* And now, we reset the pipe status for the next set of commands. */
+      pipe_status = RSH_PIPE_NONE;
+
       break;
 
       /*
@@ -271,11 +305,20 @@ int rsh_command(struct rsh_token *seq){
        */
     case NULL_LEX:
       if ( command_state != S_BASE){
+
+	/* Same as the BACKGROUND case. */
+	if ( pipe_status & (RSH_PIPE_OUT|RSH_PIPE_ERR) )
+	  pipe_status = RSH_PIPE_IN;
+	
 	ret = dispatch_process(0);
 	clear_argv();
+	pipe_status = RSH_PIPE_NONE;
 	return ret;
+
       } else {
+
 	return 0;
+
       }
 
     }
@@ -362,8 +405,6 @@ int set_stdin(char *file){
   /* If that succedes, then set stdin to be the new file descriptor. */
   proc_stdin = fd;
 
-  printf("Set new stdin fd: %d\n", proc_stdin);
-  rsh_register_fd(proc_stdin);
   return RSH_OK;
 
 }
@@ -388,8 +429,6 @@ int set_stdout(char *file, int append){
 
   proc_stdout = fd;
 
-  printf("Set new stdout fd: %d -> %s\n", proc_stdout, file);
-  rsh_register_fd(proc_stdout);
   return RSH_OK;
 
 }
@@ -414,8 +453,6 @@ int set_stderr(char *file, int append){
 
   proc_stderr = fd;
 
-  printf("Set new stderr fd: %d\n", proc_stderr);
-  rsh_register_fd(proc_stderr);
   return RSH_OK;
 
 }

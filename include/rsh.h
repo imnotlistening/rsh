@@ -102,6 +102,7 @@ int  rsh_buf_copy(struct rsh_buff *dest, struct rsh_buff *src);
 void rsh_buf_clean(struct rsh_buff *buf);
 void rsh_buf_shift(struct rsh_buff *buf, int direction);
 void rsh_buf_display(struct rsh_buff *buf);
+void rsh_reset_input();
 void rsh_stack_init(struct rsh_history_stack *stack);
 void rsh_stack_clean(struct rsh_history_stack *stack);
 int  rsh_stack_push(struct rsh_history_stack *stack, int text);

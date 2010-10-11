@@ -45,7 +45,7 @@ int main(){
 
   /* See how well rsh_exec() works for the shell. */
   printf("Execing: %s\n", prog);
-  status = rsh_exec(prog, 1, &prog, 0, 1, 2, 0);
+  status = rsh_exec(prog, 1, &prog, 0, 1, 2, 0, 0, NULL);
   printf("returned status: %d\n", status);
   if ( WIFSTOPPED(status) ){
     printf("Process was stopped, starting in a second...\n");

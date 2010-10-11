@@ -878,3 +878,15 @@ void rsh_history_display_async(int sig){
   rsh_buf_display(&buf);
 
 }
+
+/*
+ * Reset the prompt. This is useful for when back grounded processes die.
+ */
+void rsh_reset_input(){
+
+  /* Now we have to restore the terminal. */
+  prompt_print();
+  CUR_SAVE();
+  rsh_buf_display(&buf);
+
+}

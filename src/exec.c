@@ -224,7 +224,8 @@ int foreground(struct rsh_process *proc){
   } else if ( WIFSIGNALED(status) ){
 
     if ( interactive )
-      printf("\nProcess (%ld) terminated by signal.\n", (long)proc->pid);
+      printf("\nProcess (%ld) terminated by signal (%d)\n", 
+	     (long)proc->pid, WTERMSIG(status));
     status = WEXITSTATUS(status);
     cleanup_proc(proc);
 
@@ -265,11 +266,30 @@ int _parent_exec(struct rsh_process *proc){
     setpgid(proc->pid, proc->pgid);
 
   if ( proc->pipe_used ){
-    if ( proc->pipe_lane == STDIN_FILENO )
+    
+    switch ( proc->pipe_lane ){
+
+      /*
+       * This is the last bit of a pipe, we don't need to do anything.
+       */
+    case RSH_PIPE_IN:
+      break;
+
+      /*
+       * This is what we expect to get from the first of a series of pipes. We
+       * do not need the write section anymore, so just close it.
+       */
+    case RSH_PIPE_OUT:
+    case RSH_PIPE_ERR:
       close(proc->pipe[1]);
-    else if ( proc->pipe_lane == STDOUT_FILENO || 
-	      proc->pipe_lane == STDERR_FILENO )
-      close(proc->pipe[0]);
+      break;
+    case RSH_PIPE_IN_OUT:
+      break;
+    case RSH_PIPE_IN_ERR:
+      break;
+
+    }
+
   }
 
   /* Now based on whether we are an interactive shell and whether the job
@@ -301,15 +321,42 @@ int _child_exec(struct rsh_process *proc){
   
   if ( proc->pipe_used ){
 
-    /* If this pipe is for stdin, then we are reading from the pipe, and as
-     * such we do not need the write end. So close it. If this pipe is for
-     * stdout or stderr, then we don't need the read end, so close it. */
-    if ( proc->pipe_lane == STDIN_FILENO )
-      close(proc->pipe[1]);
-    else if ( proc->pipe_lane == STDOUT_FILENO || 
-	      proc->pipe_lane == STDERR_FILENO )
+    /*
+     * This switch statement is used to illustrate all the different situations
+     * so it isn't really necessary. However for calrity of code, I will keep
+     * it for now.
+     */
+    switch (proc->pipe_lane){
+
+      /*
+       * The output part of the pipe should have already been closed by rsh. So
+       * just do nothing.
+       */
+    case RSH_PIPE_IN:
+      break;
+
+      /*
+       * We are sending our output off to someone else; thus we don't need the
+       * input part of the pipe. Close it.
+       */
+    case RSH_PIPE_OUT:
+    case RSH_PIPE_ERR:
       close(proc->pipe[0]);
-    /* Else: ??? bug... */
+      break;
+
+      /*
+       * We are getting our input from a pipe, and we are sending our output to
+       * a pipe, so just again, do nothing.
+       */
+    case RSH_PIPE_IN_OUT:
+    case RSH_PIPE_IN_ERR:
+      break;
+      
+    default:
+      /* BUG */
+      return RSH_ERR;
+
+    }
 
   }
 
@@ -420,24 +467,19 @@ int rsh_exec(char *command, int argc, char *argv[], int stdin, int stdout,
   proc->argc = argc;
   proc->background = background;
   
-  if ( pipe_type == RSH_PIPE_IN ){
+  if ( pipe_type != RSH_PIPE_NONE ){
     proc->pipe_used = 1;
-    proc->pipe_lane = STDIN_FILENO;
+    proc->pipe_lane = pipe_type;
     proc->pipe[0] = pipe[0];
-    proc->pipe[0] = pipe[0];
+    proc->pipe[1] = pipe[1];
+  } else {
+    proc->pipe_used = 0;
   }
-  if ( pipe_type == RSH_PIPE_OUT ){
-    proc->pipe_used = 1;
-    proc->pipe_lane = STDOUT_FILENO;
-    proc->pipe[0] = pipe[0];
-    proc->pipe[0] = pipe[0];
-  }
-  if ( pipe_type == RSH_PIPE_ERR ){
-    proc->pipe_used = 1;
-    proc->pipe_lane = STDERR_FILENO;
-    proc->pipe[0] = pipe[0];
-    proc->pipe[0] = pipe[0];
-  }
+
+  if ( pipe_type & (RSH_PIPE_OUT|RSH_PIPE_ERR) )
+    proc->display_exit = 0;
+  else
+    proc->display_exit = 1;
 
   return _do_rsh_exec(proc);
 
@@ -526,7 +568,6 @@ struct rsh_process *get_next_proc(int *state){
 void cleanup_proc(struct rsh_process *proc){
 
   int i;
-  char _eof = 0x04;
 
   /* Close the processes pipe streams if necessary. */
   if ( proc->pipe_used ){
@@ -570,7 +611,6 @@ void check_processes(){
     if ( ! proc->background )
       continue;
 
-    printf("waitpit: %d\n", proc->pid);
     ret = waitpid(proc->pid, &status, WNOHANG|WUNTRACED);
     if ( ret == 0 )
       continue;
@@ -582,10 +622,23 @@ void check_processes(){
     /* Here we actually have a change in the process' state. */
     if ( WIFEXITED(status) ){
 
+      if ( interactive && proc->display_exit ){
+	printf("\nProcess (%ld) terminated (%d)\n", 
+	       (long)proc->pid, WEXITSTATUS(status));
+	/* Recreate whats on the terminal. */
+	rsh_reset_input();
+      }
       cleanup_proc(proc);
 
     } else if ( WIFSIGNALED(status) ){
       
+      if ( interactive && proc->display_exit ){
+	printf("\nProcess (%ld) terminated by signal (%d)\n", 
+	       (long)proc->pid, WTERMSIG(status));
+	/* Recreate whats on the terminal. */
+	rsh_reset_input();
+      }
+
       cleanup_proc(proc);
 
     } else if ( WIFSTOPPED(status) ){
