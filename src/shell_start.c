@@ -30,6 +30,8 @@ int interactive = 0;
 char *script = NULL;
 char **script_argv;
 
+char *shell_name;
+
 /* Function to source the init scripts. */
 extern int builtin_source(int argc, char **argv, int in, int out, int err);
 
@@ -80,6 +82,8 @@ int rsh_main(int argc, char **argv){
 int rsh_parse_args(int argc, char **argv){
 
   int c, args, i;
+
+  shell_name = argv[0];
 
   /* First scan for options. */
   while ( (c = getopt_long(argc, argv, "dl", options, NULL)) != -1 ){
