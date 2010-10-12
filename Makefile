@@ -9,9 +9,7 @@
 all:
 	cd src && make
 	cp src/rsh .
-	if [ ! -e os1shell ]; then \
-		ln -s rsh os1shell; \
-	fi
+	ln -f -s rsh os1shell  
 
 # This target builds RSH with GNU readline instead of my readline. This is for
 # a much more robust and fully featured readline library. On the other hand I
