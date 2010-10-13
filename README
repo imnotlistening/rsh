@@ -172,7 +172,7 @@ following data type:
       int pipe_lane; /* Which (stdin, stdout, stderr) is being piped. */
 
       /* This is cosmetic; if set, display a message if this process terminates. */
-        int display_exit;
+      int display_exit;
       /* Terminal settings. */
       struct termios term;
 
