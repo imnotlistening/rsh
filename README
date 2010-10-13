@@ -287,7 +287,50 @@ This will not work the way you expect it to. Instead:
     [rsh]$ BLAH="hello world"
     [rsh]$ export BLAH
 
-7. Random other stuff.
+7. Pipes.
+
+    RSH supports piping output from one process to another process. This is
+accomplished via the pipe() system call. pipe() generates a pair of file
+descriptors: one for reading, the other for writing. The write descriptor is
+duped into the first processes stdout (or stderr) and the read descriptor is
+duped into the second processes stdin. When the first process writes, the 
+second may then read that data. This is mostly implemented in exec.c though the
+code in command.c also needs to make sure the pipe is actually created. The
+biggest difficulty with pipes is making sure all ends get closed the 
+appropriate number of times. If the write end of the pipe never gets fully 
+closed (by rsh, first process and second process) then the pipe never 
+terminates and the shell recieving process hangs while waiting for the stream
+to EOF. On my computer here is an example demostrating a 3 stage pipe:
+
+    [rsh]$ ps aux | grep alex | grep zsh
+    alex      2038  0.0  0.0 124136  2652 pts/0    Ss   Oct10   0:00 zsh
+    alex      2073  0.0  0.0 124124  2452 pts/1    Ss   Oct10   0:00 zsh
+    alex      2339  0.0  0.0 124128  3256 pts/7    Ss   16:43   0:00 zsh
+    alex      2819  0.0  0.0 124268  3384 pts/8    Ss+  16:50   0:00 zsh
+    alex      2905  0.0  0.0 124256  3084 pts/2    Ss+  Oct10   0:00 zsh
+    alex      2940  0.0  0.0 124128  2924 pts/3    Ss   Oct10   0:00 zsh
+    alex      4815  0.0  0.0 124136  3232 pts/9    Ss+  17:05   0:00 zsh
+    alex      6582  0.0  0.0 121880  2872 pts/10   Ss   17:26   0:00 zsh
+    alex      8616  0.0  0.0 124132  3280 pts/4    Ss+  Oct10   0:00 zsh
+    alex     11339  0.0  0.0 124128  3276 pts/11   Ss   18:15   0:00 zsh
+    alex     11687  0.0  0.0 124280  3376 pts/12   Ss+  18:18   0:00 zsh
+    alex     13374  0.0  0.0 121880  2872 pts/13   Ss   18:30   0:00 zsh
+    alex     18846  0.0  0.0 124152  3352 pts/6    Ss   19:33   0:00 -zsh
+    alex     19433  0.0  0.0 123900  3024 pts/14   Ss   19:37   0:00 -zsh
+    alex     20413  0.0  0.0 102732   760 pts/14   S+   19:47   0:00 grep zsh
+    alex     25264  0.0  0.0 124280  3364 pts/5    Ss   07:32   0:00 zsh
+    [rsh]$
+
+Wow, I have a lot of terminals open. In any event, output from `ps aux' is
+piped to `grep alex' which finds all processes that I have run. Then, the
+result from the first grep is piped to a second grep to find all occurences of
+zsh. This command is simply for illustration purposes, it could be made with
+out grep pipes, but that would not be as interesting.
+
+This was probably the most complex thing to implement in the entire shell. Job
+control was hard, but this was a nightmare.
+
+8. Random other stuff.
 
     A. Builtins.
 
@@ -387,4 +430,48 @@ This will not work the way you expect it to. Instead:
 	time consuming. Piping as of now has not been implemented though should
 	actually be pretty easy; just needs the code to be written.
 
-    G. 
+    G. Signal handling by RSH
+
+        The only 2 signals explicitly handled by RSH are SIGCHLD and SIGINT.
+	SIGINT is for the assignment requirements. SIGCHLD is used to clean up
+	background processes that terminate. A common example of this is in
+	pipes. Only the last process in a pipe is foregrounded, the rest 
+	execute in the background. As such those background processes much be
+	cleaned up (mostly this is just a deallocation of the processes
+	struct rsh_process data structure). SIGCHLD solves this problem since
+	it is delivered whenever a child process changes state. When we get a
+	SIGCHLD signal, rsh goes through the process list and does a 
+	non-blocking waitpid() to see if a given process has terminated, 
+	stopped, etc (we skip foreground processes here since those are handled
+	by foreground()). If we detect a change we act accordingly.
+
+	RSH does not display every signal it recieves, since this would bog
+	down the terminal command line. However, if a process exits abnormally
+	then the cause of that exit is displayed. For instance if a process is
+	killed by a SIGINT, RSH alerts the user to that.
+
+	    [rsh]$ ./run_forever
+	    ^C
+	    Process (19049) terminated by signal (2)
+	    [rsh]$
+
+	Likewise, if a job is paused, RSH will alert the user to this event.
+	
+	    [rsh]$ ./run_forever
+	    ^C
+	    Process (19397) stopped [sig=20].
+	    [rsh]$
+	
+	Also for background processes, a message will be displayed:
+
+	    [rsh]$ sleep 5 &
+	    [rsh]$
+	    Process (19556) terminated (0)
+	    [rsh]$
+	
+	Here, the sleep program just sleeps for 5 seconds in the background. 
+	When done, it terminated, RSH recieves a SIGCHLD, searches through the
+	process list, finds out that `sleep' has terminated, and displayes a
+	message accordingly. It recreates any buffer that is being edited on
+	the command line to make sure input stays coherent.
+    
