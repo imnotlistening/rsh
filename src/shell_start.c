@@ -214,9 +214,6 @@ void rsh_rc_init(){
   if ( stat(rc_script, &sbuf) < 0)
     return;
   
-
-  printf("Loading: '%s'\n", rc_script);
-
   _argc = 2; /* As in 'source $HOME/.rshrc' */
   _argv[0] = "source";
   _argv[1] = rc_script;
