@@ -10,6 +10,7 @@
 
 #include <rsh.h>
 #include <exec.h>
+#include <rshfs.h>
 #include <lexxer.h>
 #include <builtin.h>
 #include <symbol_table.h>
@@ -28,10 +29,14 @@ int builtin_hstack(int argc, char **argv, int in, int out, int err);
 int builtin_fg(int argc, char **argv, int in, int out, int err);
 int builtin_bg(int argc, char **argv, int in, int out, int err);
 int builtin_dproc(int argc, char **argv, int in, int out, int err);
+int builtin_dfs(int argc, char **argv, int in, int out, int err);
 int builtin_export(int argc, char **argv, int in, int out, int err);
 
 /* This is defined in source.c */
 extern int builtin_source(int argc, char **argv, int in, int out, int err);
+
+/* Defined in fs_fat16.c */
+extern int builtin_fatinfo(int argc, char **argv, int in, int out, int err);
 
 /* Builtin function storage. */
 struct builtin builtins[] = {
@@ -44,6 +49,8 @@ struct builtin builtins[] = {
   {"fg", builtin_fg},
   {"bg", builtin_bg},
   {"dproc", builtin_dproc},
+  {"dfs", builtin_dfs},
+  {"fatinfo", builtin_fatinfo},
   {"source", builtin_source},
   {"export", builtin_export},
   {NULL, NULL}, /* Null terminate the table. */
@@ -252,5 +259,28 @@ int builtin_export(int argc, char **argv, int in, int out, int err){
   }
 
   return RSH_OK;
+
+}
+
+/* 
+ * Basically we just need to list the registered file system and some
+ * internal information. `df' will be done through a similar mechanic but
+ * this particular function is meant to be more for debugging. 
+ */
+extern struct rsh_file_system fs;
+extern char *rsh_cwd;
+int builtin_dfs(int argc, char **argv, int in, int out, int err){
+
+  printf("CWD: %s\n", rsh_cwd);
+  printf("FS info:\n");
+  printf("  ftable addr: 0x%016lx\n", (long unsigned int)fs.ftable);
+  printf("  ftable length: %d, used %d\n", fs.ft_length, fs.used);
+  printf("  File ops:\n");
+  printf("    read:  0x%016lx\n", (long unsigned int)fs.fops->read);
+  printf("    write: 0x%016lx\n", (long unsigned int)fs.fops->write);
+  printf("    open:  0x%016lx\n", (long unsigned int)fs.fops->open);
+  printf("    close: 0x%016lx\n", (long unsigned int)fs.fops->close);
+
+  return 0;
 
 }

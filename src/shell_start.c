@@ -7,6 +7,7 @@
 /* Shell includes */
 #include <rsh.h>
 #include <exec.h>
+#include <rshfs.h>
 #include <lexxer.h>
 #include <symbol_table.h>
 
@@ -171,8 +172,15 @@ void rsh_init(){
     exit(1);
   }
 
-  /* Save the real defaul (canonical) terminal mode. */
+  /* Save the real default (canonical) terminal mode. */
   save_default_term_settings();
+
+  /* Init the internal file system. */
+  rsh_init_fs();
+  err = rsh_fat16_init("testfs.bin", 4096, 256);
+  if ( err ){
+    printf("WARNING: Could not load internal FS.\n");
+  }
 
   /* Initialize the terminal. */
   rsh_set_input(0);
@@ -219,5 +227,16 @@ void rsh_rc_init(){
   _argv[1] = rc_script;
   _argv[2] = NULL;
   builtin_source(_argc, _argv, 0, 1, 2);
+
+}
+
+void rsh_exit(int status){
+
+  fflush(stdout);
+  fflush(stderr);
+
+  /* If I cared, maybe clean up child processes or something. But whatever
+   * I don't have time anymore :(. */
+  exit(status);
 
 }

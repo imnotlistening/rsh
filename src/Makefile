@@ -10,8 +10,10 @@ LDFLAGS  =
 LIBS     = -L../libs -lreadline -lhistory
 
 OBJECTS  = lexxer.o shell_start.o parser.o shellcore.o symbol_table.o exec.o \
-		command.o readterm.o prompt.o builtin.o source.o
-TESTS    = more_tests symtest exectest termtest
+		command.o readterm.o prompt.o builtin.o source.o fs.o \
+		fs_fat16.o
+
+TESTS    = more_tests symtest exectest termtest fat16test
 
 all: rsh $(TESTS)
 

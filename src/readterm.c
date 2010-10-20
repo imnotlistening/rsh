@@ -822,9 +822,10 @@ char *_rsh_do_read_line(){
     /* Reset the backup buffer so up/down arrow works the way we expect.  */
     rsh_buf_clean(&backup);
   
-    /* Deal with EOT from the terminal (Cntr-D) */
-    if ( c == 0x04 )
-      break;
+    /* Deal with EOT from the terminal (Cntr-D). Hack to make RSH work for
+     * project submission. */
+    if ( c == 0x04 ) 
+      rsh_exit(0);
 
     /* Backspace */
     if ( c == 0x7f ){
