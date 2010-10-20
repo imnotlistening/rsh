@@ -33,3 +33,8 @@ int     rsh_dup2(int oldfd, int newfd);
 int     rsh_open(const char *pathname, int flags, mode_t mode);
 int     rsh_close(int fd);
 
+/* Wrapper for the printf() function call that can use a descriptor. */
+int     rsh_dprintf(int fd, char *format, ...);
+
+/* Other things. */
+inline void rsh_fs(int where);
