@@ -48,7 +48,7 @@ lexxer.o: parser.lex
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(OBJECTS) $(LIBS)
 
 rsh: $(OBJECTS) main.c
-	$(LD) -o rsh main.c $(OBJECTS) $(LIBS)
+	$(CC) -o rsh main.c $(OBJECTS) $(LIBS)
 
 exectest: $(OBJECTS) exectest.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o exectest exectest.c $(OBJECTS)

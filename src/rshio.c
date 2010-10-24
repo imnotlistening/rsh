@@ -61,7 +61,7 @@ inline void rsh_fs(int where){
  * Wrapper for read(). This will either read from the native FS or the built in
  * FS depending on the the value of 'native'.
  */
-int rsh_read(int fd, void *buf, size_t count){
+ssize_t rsh_read(int fd, void *buf, size_t count){
 
   if ( native )
     return read(fd, buf, count);

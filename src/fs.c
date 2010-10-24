@@ -174,7 +174,7 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
   file->fops = fs.fops;
 
   if ( fs.fops->open )
-    err = fs.fops->open(file, pathname);
+    err = fs.fops->open(file, pathname, flags);
   else
     err = 0;
 
