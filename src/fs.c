@@ -36,7 +36,8 @@ struct rsh_file_system fs;
  */
 struct dirent dirs[DIRS_PER_READ];
 struct dirent dir_entry;
-int diri;
+int diri = 0;
+int dirs_len;
 
 /*
  * Current working directory for the RSH FS.
@@ -219,8 +220,6 @@ int _rsh_close(int fd){
 
 struct dirent *_rsh_readdir(int dfd){
 
-  int read;
-
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[dfd].used ){
     errno = EBADF;
@@ -230,9 +229,15 @@ struct dirent *_rsh_readdir(int dfd){
   if ( ! fs.fops->readdir )
     return NULL;
 
-  read = fs.fops->readdir(FD_TO_FPTR(dfd), dirs, 
-			  DIRS_PER_READ * sizeof(struct dirent));
-  
+  if ( dirs_len == 0 ){
+    dirs_len = fs.fops->readdir(FD_TO_FPTR(dfd), dirs, 
+				DIRS_PER_READ * sizeof(struct dirent));
+    if ( dirs_len == 0 )
+      return NULL;
+  }
+
+  if (
+
   return &dir_entry;
 
 }

@@ -574,6 +574,9 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
   /* Figure out how many entires we should transfer. */
   ents = space / sizeof(struct dirent);
 
+  printf("  | Copying at most %d ents to buffer.\n", ents);
+  printf("  | Next dirent to copy: %d\n", next_dirent);
+
   while ( ents > 0 ){
 
     /* Based on next_dirent, we can figure which cluster we should read the
@@ -581,19 +584,27 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
     cluster = next_dirent / ents_per_cluster;
     ent_index = next_dirent % ents_per_cluster;
 
+    printf("  | Reading from cluster: %u, offset: %u\n", cluster, ent_index);
+
     /* Now get the actual I/O memory address of the cluster. */
     cluster_addr = _rsh_fat16_find_cluster_index(file_ent->index, cluster);
-    if ( cluster_addr == FAT_TERM )
+    if ( cluster_addr == FAT_TERM ){
+      /* Reset everything. */
+      next_dirent = 0;
       break;
+    }
     dir_entries = (struct rsh_fat_dirent *) FAT_CLUSTER_TO_ADDR(cluster_addr);
 
-    if ( ! dir_entries[ent_index].name[0] )
+    if ( ! dir_entries[ent_index].name[0] ){
+      printf("  | Empty dirent, going to next.\n");
       break;
+    }
     
     /* Now just do a copy. */
     memset(dirent_p, 0, sizeof(struct dirent));
     memcpy(dirent_p->d_name, dir_entries[ent_index].name, 112);
     ents--;
+    printf("Remaining ents: %d\n", ents);
 
   }
 
