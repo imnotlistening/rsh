@@ -19,7 +19,7 @@
  * will be able to redirect I/O from a command executed natively to a file
  * stored on the RSH file system. What a nightmare. This is intended *only* for
  * built in commands. Commands that execute outside of the shell cannot use the
- * mechanics put in place here.
+ * mechanics put in place here for obvious reasons.
  */
 
 #include <rsh.h>
@@ -32,6 +32,7 @@ ssize_t rsh_write(int fd, const void *buf, size_t count);
 int     rsh_dup2(int oldfd, int newfd);
 int     rsh_open(const char *pathname, int flags, mode_t mode);
 int     rsh_close(int fd);
+struct dirent *rsh_readdir(int dfd);
 
 /* Wrapper for the printf() function call that can use a descriptor. */
 int     rsh_dprintf(int fd, char *format, ...);

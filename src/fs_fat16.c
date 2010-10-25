@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -550,6 +551,57 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
 }
 
 /*
+ * Read some amount of a directory entry into the specified buffer. This
+ * function need not be reentrant. In fact this function is not reentrant at
+ * all, and I have no desire to implement a reentrant one, it just isn't worth
+ * it. This function will return the number of directory entries placed into
+ * the buffer.
+ */
+int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
+
+  int ents;
+  int ents_per_cluster = FAT_CLUSTER_SIZE / sizeof(struct rsh_fat_dirent);
+  uint32_t cluster;
+  uint32_t ent_index;
+  uint32_t cluster_addr;
+  struct dirent *dirent_p = buf;
+  struct rsh_fat_dirent *dir_entries;
+  struct rsh_fat_dirent *file_ent = file->local;
+  
+  /* This is the state information. */
+  static int next_dirent = 0;
+
+  /* Figure out how many entires we should transfer. */
+  ents = space / sizeof(struct dirent);
+
+  while ( ents > 0 ){
+
+    /* Based on next_dirent, we can figure which cluster we should read the
+     * dirent from and how far into that cluster the dirent is stored. */
+    cluster = next_dirent / ents_per_cluster;
+    ent_index = next_dirent % ents_per_cluster;
+
+    /* Now get the actual I/O memory address of the cluster. */
+    cluster_addr = _rsh_fat16_find_cluster_index(file_ent->index, cluster);
+    if ( cluster_addr == FAT_TERM )
+      break;
+    dir_entries = (struct rsh_fat_dirent *) FAT_CLUSTER_TO_ADDR(cluster_addr);
+
+    if ( ! dir_entries[ent_index].name[0] )
+      break;
+    
+    /* Now just do a copy. */
+    memset(dirent_p, 0, sizeof(struct dirent));
+    memcpy(dirent_p->d_name, dir_entries[ent_index].name, 112);
+    ents--;
+
+  }
+
+  return (space / sizeof(struct dirent)) - ents;
+
+}
+
+/*
  * Handle the gory details of opening a file in the file system. Populate the
  * relevant file fields. The relevant options that this file system supports
  * are as follows:
@@ -1034,6 +1086,7 @@ struct rsh_io_ops fops = {
   .write = rsh_fat16_write,
   .open =  rsh_fat16_open,
   .close = rsh_fat16_close,
+  .readdir = rsh_fat16_readdir,
 
 };
 

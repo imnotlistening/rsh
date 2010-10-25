@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #define FILES_BLOCK_INC 8
+#define DIRS_PER_READ   8
 
 #define LOCATE_FILE(idx, fptr)			\
   do {						\
@@ -28,6 +29,14 @@
  * Our file system data. Important stuff.
  */
 struct rsh_file_system fs;
+
+/*
+ * A buffer for holding directory information. Also a variable to tell us the
+ * index into this array we are currently at.
+ */
+struct dirent dirs[DIRS_PER_READ];
+struct dirent dir_entry;
+int diri;
 
 /*
  * Current working directory for the RSH FS.
@@ -205,5 +214,25 @@ int _rsh_close(int fd){
   } else {
     return RSH_OK;
   }
+
+}
+
+struct dirent *_rsh_readdir(int dfd){
+
+  int read;
+
+  /* Check to make sure this is actually an open file. */
+  if ( ! fs.ftable[dfd].used ){
+    errno = EBADF;
+    return NULL;
+  }
+
+  if ( ! fs.fops->readdir )
+    return NULL;
+
+  read = fs.fops->readdir(FD_TO_FPTR(dfd), dirs, 
+			  DIRS_PER_READ * sizeof(struct dirent));
+  
+  return &dir_entry;
 
 }

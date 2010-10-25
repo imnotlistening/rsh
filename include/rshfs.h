@@ -8,26 +8,17 @@
 #include <rsh.h>
 
 #include <stdint.h>
+#include <dirent.h>
 #include <sys/types.h>
 
-/* These are the under the hood operations for the file system. */
+/* These are the under the hood operations for the file system. These are
+ * correlated to the equivalent POSIX standard calls. */
 ssize_t _rsh_read(int fd, void *buf, size_t count);
 ssize_t _rsh_write(int fd, const void *buf, size_t count);
 int     _rsh_dup2(int oldfd, int newfd);
 int     _rsh_open(const char *pathname, int flags, mode_t mode);
 int     _rsh_close(int fd);
-
-struct rsh_file;
-
-/* A definition for a file systems I/O operations. */
-struct rsh_io_ops {
-
-  ssize_t (*read)(struct rsh_file *file, void *buf, size_t count);
-  ssize_t (*write)(struct rsh_file *file, const void *buf, size_t count);
-  int     (*open)(struct rsh_file *file, const char *pathname);
-  int     (*close)(struct rsh_file *file);
-
-};
+struct dirent *_rsh_readdir(int dfd);
 
 /*
  * A structure for representing a file.
@@ -40,10 +31,6 @@ struct rsh_file {
   /* Reference count. If this hits 0, close this file. */
   int references;
 
-  /* Some info about the file. */
-  int size;
-  int modification;
-
   /* Offset into the file, self explanitory. */
   off_t offset;
 
@@ -55,18 +42,6 @@ struct rsh_file {
 
   /* A pointer into the underlying file systems data to describe the file. */
   void *local;
-
-};
-
-/*
- * A structure for describing a directory.
- */
-struct rsh_dirent {
-
-  /* This one is simple... */
-  char *name;
-  
-  /* Umm */
 
 };
 
@@ -88,6 +63,17 @@ struct rsh_file_system {
 
   /* Pointer to driver specific data. */
   void *driver;
+
+};
+
+/* A definition for a file systems I/O operations. */
+struct rsh_io_ops {
+
+  ssize_t (*read)(struct rsh_file *file, void *buf, size_t count);
+  ssize_t (*write)(struct rsh_file *file, const void *buf, size_t count);
+  int     (*open)(struct rsh_file *file, const char *pathname, int flags);
+  int     (*close)(struct rsh_file *file);
+  int     (*readdir)(struct rsh_file *file, void *buf, size_t space);
 
 };
 
@@ -139,7 +125,8 @@ struct rsh_fat16_fs {
   uint32_t fat_per_cluster;  /* Number of fat_t's that fit into a cluster. */
   uint32_t fat_clusters;     /* Number of clusters required to store FAT. */
   uint32_t fat_size;         /* Size of the FAT in bytes. */
-  
+  uint32_t dir_per_cluster;  /* Dir entries per cluster. */
+
   /* The starting address of the file systems mmap()'ed data. */
   void *fs_io;
 
@@ -161,12 +148,21 @@ struct rsh_fat_dirent {
 
 } __attribute__((packed));
 
+
+
 /* And finally some functions. */
-int   rsh_fat16_init(char *local_path, size_t size, size_t cluster);
-fat_t rsh_fat16_alloc_cluster(fat_t parent);
+int       rsh_fat16_init(char *local_path, size_t size, size_t cluster);
+fat_t     rsh_fat16_alloc_cluster(fat_t parent);
 
 /* These are intended for internal and/or debugging use. */
-fat_t _rsh_fat16_find_open_cluster();
-fat_t _rsh_fat16_get_entry(uint32_t index);
-void  _rsh_fat16_set_entry(uint32_t index, fat_t value);
-void  _rsh_fat16_display_fat();
+fat_t     rsh_fat16_get_entry(uint32_t index);
+void      rsh_fat16_set_entry(uint32_t index, fat_t value);
+int       rsh_fat16_mkdir(const char *path);
+int      _rsh_fat16_mkfile(uint32_t dir_table, const char *name);
+void     _rsh_fat16_wipe_file(struct rsh_fat_dirent *dirent);
+int      _rsh_fat16_find_open_cluster(uint32_t *addr);
+char    *_rsh_fat16_parse_path(char **copy, char **next, const char *path);
+int      _rsh_fat16_path_to_dirent(const char *path, 
+				   struct rsh_fat_dirent *ent,
+				   struct rsh_fat_dirent **fs_addr);
+void     _rsh_fat16_display_fat();
