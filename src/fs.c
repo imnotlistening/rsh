@@ -30,14 +30,6 @@
  */
 struct rsh_file_system fs;
 
-/*
- * A buffer for holding directory information. Also a variable to tell us the
- * index into this array we are currently at.
- */
-struct dirent dirs[DIRS_PER_READ];
-struct dirent dir_entry;
-int diri = 0;
-int dirs_len;
 
 /*
  * Current working directory for the RSH FS.
@@ -218,6 +210,19 @@ int _rsh_close(int fd){
 
 }
 
+/*
+ * A buffer for holding directory information. Also a variable to tell us the
+ * index into this array we are currently at.
+ */
+struct dirent dirs[DIRS_PER_READ];
+struct dirent dir_entry;
+int diri = 0;
+int dirs_len = 0;
+int almost_done = 0;
+
+/*
+ * Read a directory listing. This is a pain in the ass.
+ */
 struct dirent *_rsh_readdir(int dfd){
 
   /* Check to make sure this is actually an open file. */
@@ -226,18 +231,49 @@ struct dirent *_rsh_readdir(int dfd){
     return NULL;
   }
 
+  /* Make sure the file system supports this operation. */
   if ( ! fs.fops->readdir )
     return NULL;
 
+  /* If we need more dir entries, then get some more. */
   if ( dirs_len == 0 ){
+
+    /* This will be set if the last directory read read the last of the dir
+     * entries. Hehe, this comment is less understandable than the code. */
+    if ( almost_done )
+      goto reset;
+
     dirs_len = fs.fops->readdir(FD_TO_FPTR(dfd), dirs, 
 				DIRS_PER_READ * sizeof(struct dirent));
+
+    /* Apparently we are done since there are no more dir entries. Or maybe we
+     * are almost done. */
     if ( dirs_len == 0 )
-      return NULL;
+      goto reset;
+    else if ( dirs_len < DIRS_PER_READ )
+      almost_done = 1;
+
   }
 
-  if (
+  /* Read a directory entry from our buffer into dir_entry. Handle the wrap
+   * around here as well. */
+  dir_entry = dirs[diri++];
 
+  /* This askes the next call to this function to read more dirents */
+  if ( diri >= dirs_len ){
+    diri = 0;
+    dirs_len = 0;
+  }
+
+  /* Finally... */
   return &dir_entry;
+
+  /* Reset all of the peices of state information and the like. Then return
+   * NULL. */
+  reset:
+  diri = 0;
+  dirs_len = 0;
+  almost_done = 0;
+  return NULL;
 
 }

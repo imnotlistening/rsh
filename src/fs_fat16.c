@@ -571,6 +571,12 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
   /* This is the state information. */
   static int next_dirent = 0;
 
+  /* Verify the file descriptor. */
+  if ( file_ent->type != FAT_DIR ){
+    errno = EBADF;
+    return -1;
+  }
+
   /* Figure out how many entires we should transfer. */
   ents = space / sizeof(struct dirent);
 
