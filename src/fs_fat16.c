@@ -689,7 +689,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
       _rsh_fat16_wipe_file(child);
     }
 
-    /* This will over write data. */
+    /* This will over write data. Not if its a directory though. */
     file->offset = 0;
 
   } else {

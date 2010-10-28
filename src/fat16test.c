@@ -1,5 +1,6 @@
 /*
- * Massage the fat16 code a little bit.
+ * Massage the fat16 code a little bit. By that I mean bash with a sledge
+ * hammer made of feathers... Wait what?
  */
 
 #include <rsh.h>
@@ -24,7 +25,8 @@ extern int rsh_fat16_close(struct rsh_file *file);
 extern void _rsh_fat16_display_root_dir();
 extern void _rsh_fat16_display_path_dir(const char *path);
 
-
+extern struct dirent *_rsh_readdir(int dfd);
+extern int _rsh_open(const char *path, int flags, mode_t mode);
 int main(){
 
   int err;
@@ -148,6 +150,24 @@ int main(){
 
   /* And close the file. */
   rsh_fat16_close(&f);
+
+  /* Open a directory... */
+  printf("Opening /home for dir listing.\n");
+  memset(&f, 0, sizeof(f));
+  int dfd = _rsh_open("/home", 0, 0);
+  if ( dfd < 0 ){
+    perror("open");
+    return 1;
+  }
+
+  struct dirent *dirent;
+  while ( (dirent = _rsh_readdir(dfd)) != NULL ){
+    printf("> name: %s\n", dirent->d_name);
+  }
+  if ( errno ){
+    perror("_rsh_readdir");
+    return 1;
+  }
 
   return 0;
 

@@ -7,6 +7,7 @@
 #include <rshfs.h>
 
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -162,6 +163,7 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
 
   /* Now get down to business. Find an open file slot. */
   LOCATE_FILE(fd, file);
+  printf(" <> Found an open FD: %d\n", fd);
 
   /* This would be a bug... */
   if ( ! file )
@@ -225,29 +227,39 @@ int almost_done = 0;
  */
 struct dirent *_rsh_readdir(int dfd){
 
+  errno = 0;
+
+  printf("  Am I being called?\n");
+
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[dfd].used ){
     errno = EBADF;
+    printf("BAD.\n");
     return NULL;
   }
 
   /* Make sure the file system supports this operation. */
-  if ( ! fs.fops->readdir )
+  if ( ! fs.fops->readdir ){
+    errno = ENOSYS;
     return NULL;
+  }
 
   /* If we need more dir entries, then get some more. */
   if ( dirs_len == 0 ){
 
+    printf("  | Getting more dir entries from disk.\n");
     /* This will be set if the last directory read read the last of the dir
      * entries. Hehe, this comment is less understandable than the code. */
     if ( almost_done )
       goto reset;
 
+    printf("  | Doing read.\n");
     dirs_len = fs.fops->readdir(FD_TO_FPTR(dfd), dirs, 
 				DIRS_PER_READ * sizeof(struct dirent));
 
     /* Apparently we are done since there are no more dir entries. Or maybe we
      * are almost done. */
+    printf("  | Read %d dir entries.\n", dirs_len);
     if ( dirs_len == 0 )
       goto reset;
     else if ( dirs_len < DIRS_PER_READ )
@@ -261,6 +273,7 @@ struct dirent *_rsh_readdir(int dfd){
 
   /* This askes the next call to this function to read more dirents */
   if ( diri >= dirs_len ){
+    printf("  |Requesting more dir entries for later.\n");
     diri = 0;
     dirs_len = 0;
   }
@@ -271,6 +284,7 @@ struct dirent *_rsh_readdir(int dfd){
   /* Reset all of the peices of state information and the like. Then return
    * NULL. */
   reset:
+  printf("  | Done with that dir listing.\n");
   diri = 0;
   dirs_len = 0;
   almost_done = 0;
