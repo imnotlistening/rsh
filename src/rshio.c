@@ -58,6 +58,23 @@ inline void rsh_fs(int where){
 }
 
 /*
+ * Set access to the native or built in file system.
+ */
+int builtin_native(int argc, char **argv, int in, int out, int err){
+
+  if ( native ){
+    native = 0;
+    rsh_dprintf(out, "Using built in filesystem.\n");
+  } else {
+    native = 1;
+    rsh_dprintf(out, "Using native filesystem.\n");
+  }
+
+  return 0;
+
+}
+
+/*
  * Wrapper for read(). This will either read from the native FS or the built in
  * FS depending on the the value of 'native'.
  */

@@ -10,6 +10,7 @@
 
 #include <rsh.h>
 #include <exec.h>
+#include <rshio.h>
 #include <rshfs.h>
 #include <lexxer.h>
 #include <builtin.h>
@@ -31,12 +32,24 @@ int builtin_bg(int argc, char **argv, int in, int out, int err);
 int builtin_dproc(int argc, char **argv, int in, int out, int err);
 int builtin_dfs(int argc, char **argv, int in, int out, int err);
 int builtin_export(int argc, char **argv, int in, int out, int err);
+int builtin_xfer(int argc, char **argv, int in, int out, int err);
+
+/* These built ins are wrappers for the equivalent commands. They allow us to
+ * (relatively transparently) use the built in file system... */
+int builtin_cp(int argc, char **argv, int in, int out, int err);
+int builtin_mv(int argc, char **argv, int in, int out, int err);
+int builtin_ls(int argc, char **argv, int in, int out, int err);
+int builtin_touch(int argc, char **argv, int in, int out, int err);
+int builtin_rm(int argc, char **argv, int in, int out, int err);
 
 /* This is defined in source.c */
 extern int builtin_source(int argc, char **argv, int in, int out, int err);
 
 /* Defined in fs_fat16.c */
 extern int builtin_fatinfo(int argc, char **argv, int in, int out, int err);
+
+/* Defined in rshio.c */
+extern int builtin_native(int argc, char **argv, int in, int out, int err);
 
 /* Builtin function storage. */
 struct builtin builtins[] = {
@@ -53,6 +66,13 @@ struct builtin builtins[] = {
   {"fatinfo", builtin_fatinfo},
   {"source", builtin_source},
   {"export", builtin_export},
+  {"native", builtin_native},
+  {"xfer", builtin_xfer},
+  {"cp", builtin_cp},
+  {"mv", builtin_mv},
+  {"ls", builtin_ls},
+  {"rm", builtin_rm},
+  {"touch", builtin_touch},
   {NULL, NULL}, /* Null terminate the table. */
 
 };
@@ -212,7 +232,7 @@ int builtin_bg(int argc, char **argv, int in, int out, int err){
   }
 
   /* fg_proc is the last process to come out of the process list that is not
-   * running. We will run it in the foreground here. */
+   * running. We will run it in the background here. */
   background(bg_proc);
   return 0;
 
@@ -262,6 +282,23 @@ int builtin_export(int argc, char **argv, int in, int out, int err){
 
 }
 
+/*
+ * For now just a test of piping from a command to a built in.
+ */
+int builtin_xfer(int argc, char **argv, int in, int out, int err){
+
+  int bytes;
+  char buf[128];
+
+  while ( (bytes = rsh_read(in, buf, 127)) > 0 ){
+    buf[127] = 0;
+    rsh_dprintf(out, "%s", buf);
+  }
+
+  return 0;
+
+}
+
 /* 
  * Basically we just need to list the registered file system and some
  * internal information. `df' will be done through a similar mechanic but
@@ -280,6 +317,55 @@ int builtin_dfs(int argc, char **argv, int in, int out, int err){
   printf("    write: 0x%016lx\n", (long unsigned int)fs.fops->write);
   printf("    open:  0x%016lx\n", (long unsigned int)fs.fops->open);
   printf("    close: 0x%016lx\n", (long unsigned int)fs.fops->close);
+
+  return 0;
+
+}
+
+extern int native;
+
+int builtin_cp(int argc, char **argv, int in, int out, int err){
+
+  return 0;
+
+}
+
+int builtin_mv(int argc, char **argv, int in, int out, int err){
+
+  return 0;
+
+}
+
+int builtin_ls(int argc, char **argv, int in, int out, int err){
+
+  int no_pipe[2];
+
+  printf("in: %d\n", in);
+  printf("out: %d\n", out);
+  printf("err: %d\n", err);
+
+  if ( native ){
+    return rsh_exec(*argv, argc, argv, in, out, err, 
+		    0, RSH_PIPE_NONE, no_pipe);
+  }
+
+  /* Otherwise, we have to do this ourselves. */
+
+  printf("Closing FDs\n");
+  RSH_BUILTIN_CLOSE(in);
+  RSH_BUILTIN_CLOSE(out);
+  RSH_BUILTIN_CLOSE(err);
+  return 0;
+
+}
+
+int builtin_touch(int argc, char **argv, int in, int out, int err){
+
+  return 0;
+
+}
+
+int builtin_rm(int argc, char **argv, int in, int out, int err){
 
   return 0;
 

@@ -45,7 +45,6 @@ int pipe_status = 0;
  */
 int pipe_fds[2];
 
-
 /**
  * Dispatch a process via rsh_exec(). This will either background or foreground
  * the new process based on 'interactive'.
@@ -64,9 +63,6 @@ int dispatch_process(int background){
     return status;
 
   }
-
-  /* Handle aliases. Lol, J/K. Aliases are not implemented... yet! */
-  //handle_aliases()... Or something.
 
   status = rsh_exec(command, argc, argv, 
 		    proc_stdin, proc_stdout, proc_stderr, background,
