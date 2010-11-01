@@ -5,6 +5,7 @@
 
 #include <rsh.h>
 #include <rshfs.h>
+#include <rshio.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -31,11 +32,11 @@
  */
 struct rsh_file_system fs;
 
-
 /*
  * Current working directory for the RSH FS.
  */
-char *rsh_cwd;
+char *rsh_cwd = "/";
+char *rsh_root;
 
 int rsh_init_fs(){
 
@@ -98,11 +99,11 @@ int rsh_register_fs(struct rsh_io_ops *fops, char *name, void *driver){
     }
   }
 
-  rsh_cwd = (char *)malloc( strlen(leaf_name) + 1 );
-  if ( ! rsh_cwd )
+  rsh_root = (char *)malloc( strlen(leaf_name) + 1 );
+  if ( ! rsh_root )
     return RSH_ERR;
-  rsh_cwd[0] = '/';
-  memcpy(rsh_cwd+1, leaf_name, strlen(leaf_name));
+  rsh_root[0] = '/';
+  memcpy(rsh_root+1, leaf_name, strlen(leaf_name));
 
   /* Driver specific data. */
   fs.driver = driver;
@@ -112,6 +113,12 @@ int rsh_register_fs(struct rsh_io_ops *fops, char *name, void *driver){
 }
 
 ssize_t _rsh_read(int fd, void *buf, size_t count){
+
+  if ( ! _RSH_FD(fd) ){
+    errno = EBADF;
+    return RSH_ERR;
+  }
+  fd = _RSH_FD_TO_INDEX(fd);
 
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[fd].used ){
@@ -127,6 +134,12 @@ ssize_t _rsh_read(int fd, void *buf, size_t count){
 }
 
 ssize_t _rsh_write(int fd, const void *buf, size_t count){
+
+  if ( ! _RSH_FD(fd) ){
+    errno = EBADF;
+    return RSH_ERR;
+  }
+  fd = _RSH_FD_TO_INDEX(fd);
 
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[fd].used ){
@@ -151,6 +164,7 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
 
   int fd;
   int err;
+  char *fs_name;
   struct rsh_file *file = NULL;
 
   /* First things first, make sure we have enough room to allocate another
@@ -168,27 +182,45 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
   if ( ! file )
     return RSH_ERR;
 
+  /* Now for some real fun (not). Make sure the path that is passed is an
+   * absolute path, if it isn't, concatentate it with the CWD for the built in
+   * FS. */
+  if ( pathname[0] == '/' ){
+    fs_name = (char *)pathname;
+  } else {
+    fs_name = (char *)malloc(strlen(rsh_cwd) + strlen(pathname) + 1);
+    memcpy(fs_name, rsh_cwd, strlen(rsh_cwd));
+    strcat(fs_name, pathname);
+  }
+
   /* Fill out this file struct and pass it on to the FS driver. */
   memset(file, 0, sizeof(struct rsh_file));
   file->used = 1;
   file->references = 1;
   file->offset = 0;
-  file->path = pathname;
+  file->path = strdup(fs_name);
   file->fops = fs.fops;
+  free(fs_name);
 
   if ( fs.fops->open )
-    err = fs.fops->open(file, pathname, flags);
+    err = fs.fops->open(file, file->path, flags);
   else
     err = 0;
 
   if ( ! err )
-    return fd;
+    return fd | _RSH_FD_OFFSET;
   else
     return err;
 
 }
 
 int _rsh_close(int fd){
+
+  if ( ! _RSH_FD(fd) ){
+    errno = EBADF;
+    return RSH_ERR;
+  }
+  fd = _RSH_FD_TO_INDEX(fd);
 
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[fd].used ){
@@ -227,6 +259,12 @@ int almost_done = 0;
 struct dirent *_rsh_readdir(int dfd){
 
   errno = 0;
+
+  if ( ! _RSH_FD(dfd) ){
+    errno = EBADF;
+    return NULL;
+  }
+  dfd = _RSH_FD_TO_INDEX(dfd);
 
   /* Check to make sure this is actually an open file. */
   if ( ! fs.ftable[dfd].used ){

@@ -26,6 +26,15 @@
 
 #include <sys/types.h>
 
+/*
+ * This assumes two things: 1) native file descriptors are at least 16 bits
+ * wide, and 2) that the shell will not use more than 32768 native file
+ * descriptors (this seems fairly reasonable). 
+ */
+#define _RSH_FD_OFFSET   0x8000
+#define _RSH_FD(fd) ( fd & _RSH_FD_OFFSET )
+#define _RSH_FD_TO_INDEX(fd) ( fd & ~_RSH_FD_OFFSET )
+
 /* Definitions for RSH's version of the necessary I/O sys calls. */
 ssize_t rsh_read(int fd, void *buf, size_t count);
 ssize_t rsh_write(int fd, const void *buf, size_t count);

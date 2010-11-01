@@ -1,6 +1,6 @@
 /**
- * Gmakemake wrapper for the real main. I *hate* gmakemake. Is writing make 
- * files really *that* hard?
+ * This exists because I thought we had to use gmakemake. Since we don't this
+ * is just a relic of by gone days.
  */
 
 extern int rsh_main(int argc, char **argv);

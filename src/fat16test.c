@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+extern char *_rsh_fat16_split_path(char *path, char **name);
 extern int builtin_fatinfo(int argc, char **argv, int in, int out, int err);
 
 extern int rsh_fat16_open(struct rsh_file *file, 
@@ -27,6 +28,7 @@ extern void _rsh_fat16_display_path_dir(const char *path);
 
 extern struct dirent *_rsh_readdir(int dfd);
 extern int _rsh_open(const char *path, int flags, mode_t mode);
+
 int main(){
 
   int err;
@@ -62,6 +64,13 @@ int main(){
   while ( (node = _rsh_fat16_parse_path(&copy, &next, another_path)) != NULL)
     printf(" %s\n", node);
   */
+
+  char *name;
+  char *a_path = "h/.";
+  a_path[0] = 'k';
+  char *a_dir = _rsh_fat16_split_path(a_path, &name);
+  printf("dir='%s' name='%s'\n", a_dir, name);
+  return 0;
 
   /* Now we can traverse a path by looking at directory tables and stuff. */
   struct rsh_fat_dirent ent;

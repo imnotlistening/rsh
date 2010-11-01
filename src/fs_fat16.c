@@ -26,6 +26,22 @@ struct rsh_fat16_fs fat16_fs;
 #define FAT_CLUSTER_SIZE (fat16_fs.fs_header.csize)
 
 /*
+ * Get the geometry of a disk from the passed string. The format should be as
+ * follows: <size>:<cluster_size>. This will place the geometry in the passed
+ * 2 element array. If an error occurs, then the contents of the array are
+ * undefined and a return value < 0 will occur.
+ */
+int _rsh_fat16_geometry(char *geometry, long int *geo){
+
+  int ret = sscanf(geometry, "%li:%li", &(geo[0]), &(geo[1]));
+  if ( ret != 2 )
+    return RSH_ERR;
+
+  return RSH_OK;
+
+}
+
+/*
  * This is a *bad* function. It should only be called when there is irrevocable
  * corruption to the file system. Tihs will cause a slow and painful death for
  * the shell: AAARrrghhh.
@@ -33,8 +49,6 @@ struct rsh_fat16_fs fat16_fs;
 void rsh_fat16_badness(){
 
   printf("FAT16 filesystem irrevocably corrupt. Cry moar.\n");
-  printf("FAT table:\n");
-  _rsh_fat16_display_fat();
   exit(1);
 
 }
@@ -50,7 +64,7 @@ char *_rsh_fat16_split_path(char *path, char **name){
     if ( path[len] != '/' )
       continue;
 
-    path[len] = 0;
+    *path = 0;
     *name = path + len + 1;
     return path;
 
@@ -158,6 +172,7 @@ struct rsh_fat_dirent *_rsh_fat16_locate_child(const char *child,
     for ( i = 0; i < fat16_fs.dir_per_cluster; i++){
 
       /* We have a winner. */
+      printf(" > Checking: %s <-> %s\n", child, dir_entries[i].name);
       if ( strcmp(child, dir_entries[i].name) == 0 ){
 	child_addr = &(dir_entries[i]);
 	break;
@@ -635,6 +650,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
   char *dir, *name;
   char *copy;
   struct rsh_fat_dirent dirent;
+  struct rsh_fat_dirent *dirent_p;
   struct rsh_fat_dirent *child;
   
   copy = strdup(pathname);
@@ -652,7 +668,10 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
     if ( err )
       return err;
   } else {
-    dirent = *(_rsh_fat16_locate_child(".", fat16_fs.fs_header.root_offset));
+    dirent_p = _rsh_fat16_locate_child(".", fat16_fs.fs_header.root_offset);
+    if ( ! dirent_p )
+      rsh_fat16_badness();
+    dirent = *dirent_p;
   }
   printf("open: Got directory table: %u\n", dirent.index);
 
@@ -1018,6 +1037,7 @@ int _rsh_fat16_init_creat(char *path, struct rsh_fat16_fs *fs,
   dot = FAT_CLUSTER_TO_ADDR(fs->fs_header.root_offset);
   dotdot = FAT_CLUSTER_TO_ADDR(fs->fs_header.root_offset) + 
     sizeof(struct rsh_fat_dirent);
+  printf("dot & dotdot MMAP IO addresses: %p & %p\n", dot, dotdot);
 
   /* dot points to ourselves. */
   strcpy(dot->name, ".");
@@ -1089,6 +1109,7 @@ int _rsh_fat16_init_open(char *path, struct rsh_fat16_fs *fs){
     fs->fat_clusters++;
   }
   fs->fat_per_cluster = fs->fs_header.csize / sizeof(fat_t);
+  fs->dir_per_cluster = fs->fs_header.csize / sizeof(struct rsh_fat_dirent);
   fs->fat_size = fs->fat_entries * sizeof(fat_t);
 
   /* OK, and we are done. */
@@ -1122,8 +1143,6 @@ int rsh_fat16_init(char *local_path, size_t size, size_t cluster){
     err = _rsh_fat16_init_creat(local_path, &fat16_fs, size, cluster);
   else
     err = _rsh_fat16_init_open(local_path, &fat16_fs);
-
-  printf(" FAT16 has been loaded.\n");
 
   if ( err )
     return err;

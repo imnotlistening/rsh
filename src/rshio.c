@@ -39,7 +39,7 @@ int rsh_dprintf(int fd, char *format, ...){
   vsnprintf(buf, BUFFER_SIZE, format, args);
   len = strlen(buf);
 
-  written = write(fd, buf, len);
+  written = rsh_write(fd, buf, len);
   if ( written != len )
     return RSH_ERR;
 
@@ -55,6 +55,17 @@ inline void rsh_fs(int where){
 
   native = where;
   
+}
+
+/*
+ * Return > 0 if the specified path is located on the native file system. If
+ * the path is a relative path, then the path will be interpretted as native if
+ * RSH is currently using the naitve file system as default or visa versa.
+ */
+int rsh_path_location(char *path){
+
+  return 0;
+
 }
 
 /*
@@ -80,7 +91,7 @@ int builtin_native(int argc, char **argv, int in, int out, int err){
  */
 ssize_t rsh_read(int fd, void *buf, size_t count){
 
-  if ( native )
+  if ( ! _RSH_FD(fd) )
     return read(fd, buf, count);
   else
     return _rsh_read(fd, buf, count);
@@ -92,7 +103,7 @@ ssize_t rsh_read(int fd, void *buf, size_t count){
  */
 ssize_t rsh_write(int fd, const void *buf, size_t count){
 
-  if ( native )
+  if ( ! _RSH_FD(fd) )
     return write(fd, buf, count);
   else
     return _rsh_write(fd, buf, count);
@@ -125,9 +136,23 @@ int rsh_open(const char *pathname, int flags, mode_t mode){
  */
 int rsh_close(int fd){
 
-  if ( native )
+  if ( ! _RSH_FD(fd) )
     return close(fd);
   else
     return _rsh_close(fd);
+
+}
+
+/*
+ * Wrapper for readdir(). This will *only* work for builtin functions since
+ * the libc version uses a pointer to a DIR type in order to specify the file.
+ * Here we use a file descriptor instead.
+ */
+struct dirent *rsh_readdir(int dfd){
+
+  if ( ! _RSH_FD(dfd) )
+    return NULL;
+  else
+    return _rsh_readdir(dfd);
 
 }

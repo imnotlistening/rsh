@@ -33,6 +33,13 @@ char **script_argv;
 
 char *shell_name;
 
+/* Name of the built in file system image. */
+char *bifs = "builtin_fs.img";
+
+/* Stuff specific to the FAT16 used. */
+long int geometry[2] = { 1024*1024, 1024 };;
+extern int _rsh_fat16_geometry(char *geometry, long int *geo);
+
 /* Function to source the init scripts. */
 extern int builtin_source(int argc, char **argv, int in, int out, int err);
 
@@ -44,6 +51,9 @@ static struct option options[] = {
 
   { "debug", 0, NULL, 'd' },
   { "login", 0, NULL, 'l' },
+  { "filesystem", 1, NULL, 'f' }, 
+  { "geometry", 1, NULL, 'g' },
+  { "native", 1, NULL, 'n' },
   { NULL, 0, NULL, 0 }
 
 };
@@ -95,6 +105,17 @@ int rsh_parse_args(int argc, char **argv){
       break;
     case 'l':
       login = 1;
+      break;
+    case 'f':
+      bifs = optarg;
+      break;
+    case 'g':
+      if ( _rsh_fat16_geometry(optarg, geometry) ){
+	fprintf(stderr, "Warning: unable to parse geometry.\n");
+	/* Go back to default I guess. */
+	geometry[0] = 1024*1024;
+	geometry[0] = 1024;
+      }
       break;
     case '?':
       return RSH_ERR;
@@ -177,7 +198,8 @@ void rsh_init(){
 
   /* Init the internal file system. */
   rsh_init_fs();
-  err = rsh_fat16_init("testfs.bin", 4096, 256);
+  printf("Loading disk image: %s (%ld:%ld)\n", bifs, geometry[0], geometry[1]);
+  err = rsh_fat16_init(bifs, geometry[0], geometry[1]);
   if ( err ){
     printf("WARNING: Could not load internal FS.\n");
   }
