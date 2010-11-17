@@ -219,14 +219,11 @@ int _rsh_fat16_path_to_dirent(const char *path, struct rsh_fat_dirent *ent,
   uint32_t dir_tbl = fat16_fs.fs_header.root_offset;
   struct rsh_fat_dirent *child;
 
-  printf("parsing path: <%s>\n", path);
-
   /* Start with the root directory entry and start looking up path nodes. */
   char *node;
   char *copy = NULL, *next = NULL;
   while ( (node = _rsh_fs_parse_path(&copy, &next, path)) != NULL){
 
-    printf("parsing path ent: %s\n", node);
     child = _rsh_fat16_locate_child(node, dir_tbl);
     if ( ! child ){
       errno = ENOENT;
@@ -373,8 +370,6 @@ ssize_t rsh_fat16_read(struct rsh_file *file, void *buf, size_t count){
   if ( file_ent->size == 0 )
     clusters = 1;
 
-  printf("  | File clusters: %u\n", clusters);
-
   while ( remaining > 0 && (file->offset < file_ent->size) ){
 
     /* First find the source cluster. */
@@ -388,12 +383,6 @@ ssize_t rsh_fat16_read(struct rsh_file *file, void *buf, size_t count){
     if ( (file_ent->size - file->offset) < xfer_size )
       xfer_size = file_ent->size - file->offset;
 
-    printf("  | Remaining bytes: %d\n", remaining);
-    printf("  | Current cluster offset: %u\n", cluster);
-    printf("  | Cluster address: %u\n", cluster_addr);
-    printf("  | cluster offset: %u\n", cluster_offset);
-    printf("  | xfer size: %d\n", xfer_size);
-
     /* Now we can do the transfer. */
     memcpy(buffer, cluster_io, xfer_size);
 
@@ -401,9 +390,6 @@ ssize_t rsh_fat16_read(struct rsh_file *file, void *buf, size_t count){
     file->offset += xfer_size;
     remaining -= xfer_size;
     buffer += xfer_size;
-
-    printf("  | Book keeping: file->offset = %u & remaining = %d\n", 
-	   (uint32_t) file->offset, remaining);
 
   }
 
@@ -446,13 +432,10 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
   if ( file_ent->size == 0 )
     clusters = 1;
   
-  printf("  | clusters in file: %u\n", clusters);
-
   /* Deal with the write. */
   while ( remaining > 0 ){
 
     cluster = file->offset / FAT_CLUSTER_SIZE;
-    printf("  | writing to cluster %u\n", cluster);
 
     /* First we prepare the source cluster for the transfer. We will only
      * write to the FS in buffers equal to the cluster size. This makes the
@@ -463,8 +446,6 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
     xfer_size = remaining;
     if ( xfer_size > FAT_CLUSTER_SIZE )
       xfer_size = FAT_CLUSTER_SIZE - cluster_offset;
-    printf("  | cluster_offset = %u & xfer_size = %d\n", 
-	   cluster_offset, xfer_size);
 
     /* Back up the cluster's storage if we have to. */
     if ( cluster_offset )
@@ -481,11 +462,9 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
      * clusters into the file we are and then determine if that cluster exists.
      * If the cluster does not yet exist, we must allocate one. */
     cluster_addr = _rsh_fat16_find_cluster_index(file_ent->index, cluster);
-    printf("  | cluster_addr = %x\n", cluster_addr);
 
     /* If we need to allocate a new cluster, do so here. */
     if ( cluster_addr == FAT_TERM ){
-      printf("  |   Allocating new cluster...\n");
       cluster_index = _rsh_fat16_follow_head(file_ent->index, -1);
       err = __rsh_fat16_find_open_cluster(&cluster_addr);
       if ( err ){
@@ -494,7 +473,6 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
       }
       rsh_fat16_set_entry(cluster_index, cluster_addr);
       rsh_fat16_set_entry(cluster_addr, FAT_TERM);
-      printf("  | cluster_addr = %x\n", cluster_addr);
     }
 
     /* We have the cluster address, get an IO address. */
@@ -506,9 +484,6 @@ ssize_t rsh_fat16_write(struct rsh_file *file, const void *buf, size_t count){
     file->offset += xfer_size;
     if ( file->offset > file_ent->size )
       file_ent->size = file->offset;
-    printf("  | Book keeping:\n");
-    printf("  |   remaining = %d ; size = %u ; offset = %u\n",
-	   remaining, file_ent->size, (unsigned int)file->offset);
 
   }
 
@@ -615,9 +590,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
   }
   if ( copy[strlen(copy)-1] == '/' && strlen(copy) > 1 )
     copy[strlen(copy)-1] = 0;
-  printf("Splitting: %s\n", copy);
   dir = _rsh_fat16_split_path(copy, &name);
-  printf("Opening: dir=%s child=%s\n", dir, name);
 
   /* Set the file's local pointer to the address of this file's dirent on the
    * file system. Thats all we need to do, but this is a little more complex
@@ -635,12 +608,10 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
       rsh_fat16_badness();
     dirent = *dirent_p;
   }
-  printf("open: Got directory table: %u\n", dirent.index);
 
   /* Now dirent is filled out, we should think about the file... */
   if ( *name ){
 
-    printf("looking up '%s'\n", name);
     child = _rsh_fat16_locate_child(name, dirent.index);
     if ( ! child ){
       /* The child doesn't exist, should we create one for the user? */
@@ -653,7 +624,6 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
       }
       child = _rsh_fat16_locate_child(name, dirent.index);
     }
-    printf("open: Found a suitable child node.\n");
 
     /* Now, based on O_APPEND and O_TRUNC we should act accordingly. */
     if ( flags & O_APPEND && flags & O_TRUNC ){
@@ -663,11 +633,9 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
     }
 
     if ( flags & O_APPEND ){
-      printf("open: Opening for appending.\n");
       file->offset = child->size;
     }
     if ( flags & O_TRUNC ){
-      printf("open: truncating.\n");
       file->offset = 0;
       _rsh_fat16_wipe_file(child);
     }
@@ -813,9 +781,7 @@ int rsh_fat16_mkdir(const char *path){
   if ( copy[strlen(copy)-1] == '/' )
     copy[strlen(copy)-1] = 0;
 
-  printf("--> copy: %s\n", copy);
   dir = _rsh_fat16_split_path(copy, &name);
-  printf("parent: %s, new dir: %s\n", dir, name);
 
   /* New directory is in the root directory. */
   if ( ! *dir ){
@@ -864,7 +830,6 @@ int _rsh_fat16_mkfile(uint32_t dir_table, const char *name){
     return RSH_ERR;
   }
   rsh_fat16_set_entry(file_cluster, FAT_TERM);
-  printf("Setting file cluster FAT entry (%u) to FAT_TERM\n", file_cluster);
 
   /* Fill in the file's entry. */
   strncpy(slot->name, name, 112);
@@ -949,7 +914,6 @@ int _rsh_fat16_init_creat(char *path, struct rsh_fat16_fs *fs,
   struct rsh_fat_dirent *dotdot;
 
   if ( sizeof(struct rsh_fat_dirent) * 3 > cluster ){
-    printf("Cluster size too small.\n");
     return RSH_ERR;
   }
 
@@ -1015,7 +979,6 @@ int _rsh_fat16_init_creat(char *path, struct rsh_fat16_fs *fs,
   dot = FAT_CLUSTER_TO_ADDR(fs->fs_header.root_offset);
   dotdot = FAT_CLUSTER_TO_ADDR(fs->fs_header.root_offset) + 
     sizeof(struct rsh_fat_dirent);
-  printf("dot & dotdot MMAP IO addresses: %p & %p\n", dot, dotdot);
 
   /* dot points to ourselves. */
   strcpy(dot->name, ".");
@@ -1088,9 +1051,7 @@ int rsh_fat16_unlink(const char *path){
   if ( copy[strlen(copy)-1] == '/' )
     copy[strlen(copy)-1] = 0;
 
-  printf("--> copy: %s\n", copy);
   dir = _rsh_fat16_split_path(copy, &name);
-  printf("parent: %s, node: %s\n", dir, name);
 
   /* New directory is in the root directory. */
   if ( ! *dir ){
@@ -1113,7 +1074,6 @@ int rsh_fat16_unlink(const char *path){
    * and dirent holds the directory with in which name resides. */
   if ( child->type == FAT_DIR ){
     if ( ! _rsh_fat16_is_empty_dir(child) ){
-      printf("dir is not empty.\n");
       errno = EISDIR;
       return -1;
     }

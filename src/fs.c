@@ -141,7 +141,6 @@ char *_rsh_fs_parse_path(char **copy, char **next, const char *start){
   }
 
   /* Find the end of this node. */
-  //printf("--| remaining: <%s> (**next = %d)\n", *next, **next);
   end = *next;
   while ( *end != 0 ){
     if ( *end == '/' )
@@ -154,7 +153,6 @@ char *_rsh_fs_parse_path(char **copy, char **next, const char *start){
     free(*copy);
     *next = NULL;
     *copy = NULL;
-    //printf("<<fin>>\n");
     return NULL;
   }
 
@@ -181,12 +179,9 @@ char *_rsh_fs_rel2abs(const char *path){
   if ( path[0] == '/' ){
     return strdup(path);
   } else {
-    printf("<> Builing path string... ");
     fs_name = (char *)malloc(strlen(rsh_cwd) + strlen(path) + 1);
     memcpy(fs_name, rsh_cwd, strlen(rsh_cwd)+1);
-    printf("(%s) ", fs_name);
     strcat(fs_name, path);
-    printf("%s\n", fs_name);
     return fs_name;
   }
 
@@ -268,19 +263,15 @@ int _rsh_chdir(const char *dir){
     return RSH_ERR;
   }
 
-  printf("tmp=%s\n", tmp);
   _rsh_fs_interpolate(tmp);
-  printf("new tmp=%s\n", tmp);
 
   full_path = (char *)malloc(strlen(tmp) + 2);
   memcpy(full_path, tmp, strlen(tmp)+1);
 
-  printf("int full_path: %s\n", full_path);
   if ( full_path[strlen(full_path)-1] != '/' ){
     full_path[strlen(full_path)+1] = 0;
     full_path[strlen(full_path)] = '/';
   }
-  printf("new working derr: %s\n", full_path);
 
   fd = _rsh_open(full_path, 0, 0);
   if ( fd < 0 ){
@@ -439,12 +430,10 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
 
   /* This would be a bug... */
   if ( ! file ){
-    printf("FS bug detected.\n");
     return RSH_ERR;
   }
 
   fs_name = _rsh_fs_rel2abs(pathname);
-  printf("<> Opening: %s\n", fs_name);
 
   /* Fill out this file struct and pass it on to the FS driver. */
   memset(file, 0, sizeof(struct rsh_file));
@@ -596,8 +585,6 @@ int _rsh_fstat(int fd, struct stat *buf){
     return RSH_ERR;
   }
 
-  printf("  Filling stat in info for: (%d) %s\n", fd, FD_TO_FILE(fd).path);
-
   /* Fill in the relevant data fields. */
   buf->st_dev = 0;                 /* No dev ID since we are in userspace. */
   buf->st_ino = 0;                 /* Same idea, were in user space. */
@@ -620,8 +607,6 @@ int _rsh_mkdir(const char *path){
 
   char *fs_name = _rsh_fs_rel2abs(path);
 
-  printf("Making dir: %s\n", fs_name);
-
   if ( fs.fops->mkdir ){
     return fs.fops->mkdir(fs_name);
   } else {
@@ -634,7 +619,6 @@ int _rsh_mkdir(const char *path){
 int _rsh_unlink(const char *path){
 
   char *fs_name = _rsh_fs_rel2abs(path);
-  printf("Deleting %s\n", fs_name);
 
   if ( fs.fops->unlink )
     return fs.fops->unlink(fs_name);

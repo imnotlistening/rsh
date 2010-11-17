@@ -461,8 +461,6 @@ int _rsh_cp_bifs_expand(char *star_path){
   struct stat statbuf;
   struct dirent *dent;
 
-  printf("Expanding (builtin) dir: %s\n", star_path);
-
   dfd = rsh_open(star_path, 0, 0);
   if ( ! dfd ){
     perror("rsh_open");
@@ -473,7 +471,6 @@ int _rsh_cp_bifs_expand(char *star_path){
   while ( (dent = rsh_readdir(dfd)) != NULL ){
 
     combined = _combine_paths(star_path, dent->d_name);
-    printf("using: %s\n", combined);
 
     fd = rsh_open(combined, 0, 0);
     if ( fd < 0 ){
@@ -528,7 +525,6 @@ int _rsh_cp_native_expand(char *star_path){
   while ( (dent = readdir(dfd)) != NULL ){
 
     combined = _combine_paths(star_path, dent->d_name);
-    printf("Using: %s\n", combined);
 
     if ( lstat(combined, &statbuf) ){
       perror("(native) lstat");
@@ -568,7 +564,6 @@ int _rsh_cp_star_expand(char *_star_path){
 
   /* Chop the trailing star off. */
   star_path[strlen(star_path)-1] = 0;
-  printf("<< Expanding %s>>\n", star_path);
 
   /* Now, if the path is native, then use the native expand, if its a built in
    * then use the builtin expansion. The reason this must be done is becuase
@@ -649,8 +644,6 @@ int _do_copy(char *source, char *dest){
     dest_file_name = dest;
   }
 
-  printf("  --> Writing to '%s'\n", dest_file_name);
-
   source_fd = rsh_open(source, O_RDONLY, 0);
   if ( source_fd < 0 ){
     perror("rsh_open");
@@ -690,8 +683,6 @@ int builtin_cp(int argc, char **argv, int in, int out, int err){
   int ret = 0, tmpret;
   char *dest;
   struct stat buf;
-
-  printf("builtin: %s\n", *argv);
   
   /*
    * First we have to do * expansion. We wont be getting * as a regular
@@ -719,14 +710,10 @@ int builtin_cp(int argc, char **argv, int in, int out, int err){
 
   /* The destination. */
   dest = argv[argc-1];
-  printf("destination: %s\n", dest);
 
   /* Iterate over all passed files. If there is a * then do * expansion. */
   for ( i = 0; i < argc-1; i++ ){
     
-    printf("argv[i] = %s\n", argv[i]);
-    printf("* character: %c\n", argv[i][ strlen(argv[i])-1 ] );
-
     if ( argv[i][strlen(argv[i])-1] == '*' )
       tmpret = _rsh_cp_star_expand(argv[i]);
     else 
@@ -795,8 +782,6 @@ int builtin_mv(int argc, char **argv, int in, int out, int err){
 
   int ret = 0;
   char *cp_argv[4];
-
-  printf("builtin: %s\n", *argv);
 
   if ( argc != 3 ){
     rsh_dprintf(err, "Usage: mv <source> <dest>\n");
@@ -957,7 +942,6 @@ int builtin_ls(int argc, char **argv, int in, int out, int err){
     ent_list[list_index] = *dirent;
 
     list_index++;
-    rsh_dprintf(out, "Read: %s\n", dirent->d_name);
 
   }
   if ( errno ){
@@ -977,7 +961,6 @@ int builtin_ls(int argc, char **argv, int in, int out, int err){
   }
 
   for ( i = 0; i < list_index; i++){
-    printf("Statting: %s\n", ent_list[i].d_name);
     fd = rsh_open(ent_list[i].d_name, 0, 0);
     if ( fd < 0 ){
       perror("rsh_open");
