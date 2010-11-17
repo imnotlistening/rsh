@@ -27,6 +27,10 @@ uid_t euid;
 struct passwd *user_info;
 
 /*
+ * Characters for write to use.
+ */
+
+/*
  * Make sure the symbol table has the default prompt set up. Also set up some
  * stuff for the display escape sequences.
  */
@@ -64,7 +68,7 @@ void prompt_print(){
       switch ( *prompt ){
 
       case '\\': /* Just print a '%' character. */
-	putchar('\\');
+	printf("/");
 	break;
       case 'u': /* User name. */
 	_display_user_name();
@@ -81,14 +85,14 @@ void prompt_print(){
       case 'h': /* Host name up to the first dot. */
 	_display_short_hostname();
 	break;
-      case 'e': /* Escape character. */
-	putchar(0x1b);
+      case 'e': /* Escape character. HAHA just kidding. */
+	/*putchar(0x1b);*/
 	break;
       case '$': /* If the EUID is 0, print a '#', otherwise print a '$'. */
 	if ( euid == 0 )
-	  putchar('#');
+	  printf("#");
 	else
-	  putchar('$');
+	  printf("$");
 	break;
       default:
 	/* If we don't understand it, ignore it. */
@@ -98,7 +102,7 @@ void prompt_print(){
 
     } else {
       /* Otherwise, just print the character. */
-      putchar(*prompt);
+      printf("%c", *prompt);
     }
 
     prompt++;
