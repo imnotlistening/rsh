@@ -24,6 +24,7 @@ struct rsh_fat16_fs fat16_fs;
   ( memset(cluster_io_addr, 0, fat16_fs.fs_header.csize) )
 
 #define FAT_CLUSTER_SIZE (fat16_fs.fs_header.csize)
+#define MEDIUM_BLK_SIZE  4096 /* Size of a page in Linux. */
 
 /*
  * Get the geometry of a disk from the passed string. The format should be as
@@ -64,7 +65,7 @@ char *_rsh_fat16_split_path(char *path, char **name){
     if ( path[len] != '/' )
       continue;
 
-    *path = 0;
+    path[len] = 0;
     *name = path + len + 1;
     return path;
 
@@ -172,7 +173,6 @@ struct rsh_fat_dirent *_rsh_fat16_locate_child(const char *child,
     for ( i = 0; i < fat16_fs.dir_per_cluster; i++){
 
       /* We have a winner. */
-      printf(" > Checking: %s <-> %s\n", child, dir_entries[i].name);
       if ( strcmp(child, dir_entries[i].name) == 0 ){
 	child_addr = &(dir_entries[i]);
 	break;
@@ -208,55 +208,6 @@ inline struct rsh_fat_dirent *_rsh_fat16_find_open_dirent(uint32_t dir_tbl){
 }
 
 /*
- * Parse a node out of a path. To parse out all nodes (and the leaf) use this
- * function like so:
- *
- *   char *node;
- *   char *path = ...; // The path string.
- *   char *copy, *next;
- *   while ( (node = _rsh_fat16_parse_path(&copy, &next, path)) != NULL )
- *     // Use node
- *
- * This function will assume that the passed path is an absolute path. If not
- * then you will loose the first character in the first returned node. Just
- * make sure you use an absolute path.
- */
-char *_rsh_fat16_parse_path(char **copy, char **next, const char *start){
-
-  char *end;
-  char *ret;
-
-  if ( ! *copy ){
-    *copy = strdup(start);
-    *next = *copy + 1; /* Dump the leading slash. */
-  }
-
-  /* Find the end of this node. */
-  end = *next;
-  while ( *end != 0 ){
-    if ( *end == '/' )
-      break;
-    end++;
-  }
-
-  /* We are done. Cleanup our resources. */
-  if ( *next == end ){
-    free(*copy);
-    *next = NULL;
-    *copy = NULL;
-    return NULL;
-  }
-
-  /* Otherwise, return the node of interest. */
-  ret = *next;
-  *end = 0;
-  *next = end + 1;
-
-  return ret;
-
-}
-
-/*
  * Take a path and find the dir entry that corresponds to that path. The dirent
  * is copied into the rsh_fat_dirent struct passed to this function in ent. If
  * an error occurs, then a negative return value will result. Check errno for
@@ -268,11 +219,14 @@ int _rsh_fat16_path_to_dirent(const char *path, struct rsh_fat_dirent *ent,
   uint32_t dir_tbl = fat16_fs.fs_header.root_offset;
   struct rsh_fat_dirent *child;
 
+  printf("parsing path: <%s>\n", path);
+
   /* Start with the root directory entry and start looking up path nodes. */
   char *node;
   char *copy = NULL, *next = NULL;
-  while ( (node = _rsh_fat16_parse_path(&copy, &next, path)) != NULL){
+  while ( (node = _rsh_fs_parse_path(&copy, &next, path)) != NULL){
 
+    printf("parsing path ent: %s\n", node);
     child = _rsh_fat16_locate_child(node, dir_tbl);
     if ( ! child ){
       errno = ENOENT;
@@ -292,7 +246,7 @@ int _rsh_fat16_path_to_dirent(const char *path, struct rsh_fat_dirent *ent,
 
     /* OK, we have a regular file node. This is a problem if there are more
      * nodes in the path. */
-    if ( _rsh_fat16_parse_path(&copy, &next, path) != NULL ){
+    if ( _rsh_fs_parse_path(&copy, &next, path) != NULL ){
       errno = ENOTDIR;
       return -1;
     } else {
@@ -576,7 +530,6 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
 
   int ents;
   int ents_per_cluster = FAT_CLUSTER_SIZE / sizeof(struct rsh_fat_dirent);
-  int almost_done = 0;
   uint32_t cluster;
   uint32_t ent_index;
   uint32_t cluster_addr;
@@ -586,6 +539,7 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
   
   /* This is the state information. */
   static int next_dirent = 0;
+  static int almost_done = 0;
 
   /* Verify the file descriptor. */
   if ( file_ent->type != FAT_DIR ){
@@ -607,6 +561,7 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
     /* Check if we are done. */
     if ( ent_index == 0 && almost_done ){
       next_dirent = 0;
+      almost_done = 0;
       break;
     }
     
@@ -647,7 +602,7 @@ int rsh_fat16_readdir(struct rsh_file *file, void *buf, size_t space){
 int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
 
   int err;
-  char *dir, *name;
+  char *dir = NULL, *name = NULL;
   char *copy;
   struct rsh_fat_dirent dirent;
   struct rsh_fat_dirent *dirent_p;
@@ -658,15 +613,22 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
     errno = ENOMEM;
     return -1;
   }
+  if ( copy[strlen(copy)-1] == '/' && strlen(copy) > 1 )
+    copy[strlen(copy)-1] = 0;
+  printf("Splitting: %s\n", copy);
   dir = _rsh_fat16_split_path(copy, &name);
+  printf("Opening: dir=%s child=%s\n", dir, name);
 
   /* Set the file's local pointer to the address of this file's dirent on the
    * file system. Thats all we need to do, but this is a little more complex
    * than it first appears. */
   if ( *dir ){
     err = _rsh_fat16_path_to_dirent(dir, &dirent, NULL);
-    if ( err )
+    if ( err ){
+      free(copy);
+      errno = ENOTDIR;
       return err;
+    }
   } else {
     dirent_p = _rsh_fat16_locate_child(".", fat16_fs.fs_header.root_offset);
     if ( ! dirent_p )
@@ -678,6 +640,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
   /* Now dirent is filled out, we should think about the file... */
   if ( *name ){
 
+    printf("looking up '%s'\n", name);
     child = _rsh_fat16_locate_child(name, dirent.index);
     if ( ! child ){
       /* The child doesn't exist, should we create one for the user? */
@@ -685,6 +648,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
 	_rsh_fat16_mkfile(dirent.index, name);
       } else {
 	errno = ENOENT;
+	free(copy);
 	return -1;
       }
       child = _rsh_fat16_locate_child(name, dirent.index);
@@ -694,6 +658,7 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
     /* Now, based on O_APPEND and O_TRUNC we should act accordingly. */
     if ( flags & O_APPEND && flags & O_TRUNC ){
       errno = EINVAL;
+      free(copy);
       return -1;
     }
 
@@ -716,6 +681,18 @@ int rsh_fat16_open(struct rsh_file *file, const char *pathname, int flags){
 
   file->local = child;
 
+  /* Fill in relevant file struct data fields. */
+  file->mode = S_IRWXU | S_IRWXG | S_IRWXO; /* 777 */
+  file->mode |= ( child->type == 0xFF ? S_IFDIR : S_IFREG );
+  file->size = child->size;
+  file->block_size = (long int) fat16_fs.fs_header.csize;
+  file->blocks = file->size / file->block_size;
+  if ( file->block_size * file->block_size < file->size)
+    file->blocks++;
+  file->access_time = child->epoch;
+
+  free(copy);
+  
   return 0;
 
 }
@@ -836,6 +813,7 @@ int rsh_fat16_mkdir(const char *path){
   if ( copy[strlen(copy)-1] == '/' )
     copy[strlen(copy)-1] = 0;
 
+  printf("--> copy: %s\n", copy);
   dir = _rsh_fat16_split_path(copy, &name);
   printf("parent: %s, new dir: %s\n", dir, name);
 
@@ -1064,6 +1042,96 @@ int _rsh_fat16_init_creat(char *path, struct rsh_fat16_fs *fs,
 }
 
 /*
+ * Returns true if the passed directory is empty.
+ */
+int _rsh_fat16_is_empty_dir(struct rsh_fat_dirent *ent){
+
+  int i;
+  int ents_per_cluster = FAT_CLUSTER_SIZE / sizeof(struct rsh_fat_dirent);
+  uint32_t cluster = ent->index;      /* Cluster offset. */
+  struct rsh_fat_dirent *subents;
+  
+  do {
+
+    if ( cluster == FAT_FREE || cluster == FAT_RESERVED )
+      rsh_fat16_badness();
+
+    subents = FAT_CLUSTER_TO_ADDR(cluster);
+    for ( i = 0; i < ents_per_cluster; i++){
+      if ( strcmp(subents[i].name, ".") && strcmp(subents[i].name, "..") )
+	if ( subents[i].name[0] )
+	  return 0;
+    }
+
+    cluster = rsh_fat16_get_entry(cluster);
+
+  } while ( cluster != FAT_TERM );
+
+  return 1;
+
+}
+
+/*
+ * Unlink a node from the file system. Will only delete directories if they are
+ * empty.
+ */
+int rsh_fat16_unlink(const char *path){
+
+  int err;
+  char *copy;
+  char *dir, *name;
+  struct rsh_fat_dirent top_ent;
+  struct rsh_fat_dirent *child;
+  
+  copy = strdup(path);
+  /* If the last character is a '/', nuke it. */
+  if ( copy[strlen(copy)-1] == '/' )
+    copy[strlen(copy)-1] = 0;
+
+  printf("--> copy: %s\n", copy);
+  dir = _rsh_fat16_split_path(copy, &name);
+  printf("parent: %s, node: %s\n", dir, name);
+
+  /* New directory is in the root directory. */
+  if ( ! *dir ){
+    /* Fill in ent enough to point to the root directory table. */
+    top_ent.index = fat16_fs.fs_header.root_offset;
+  } else {
+    err = _rsh_fat16_path_to_dirent(dir, &top_ent, NULL);
+    if ( err )
+      return err;
+  }
+
+  /* Find the entity that we want to delete in the current ent. */
+  child = _rsh_fat16_locate_child(name, top_ent.index);
+  if ( ! child ){
+    errno = ENOENT;
+    return -1;
+  }
+
+  /* Now we have a dirent at which we can start. Name is the thing to delete
+   * and dirent holds the directory with in which name resides. */
+  if ( child->type == FAT_DIR ){
+    if ( ! _rsh_fat16_is_empty_dir(child) ){
+      printf("dir is not empty.\n");
+      errno = EISDIR;
+      return -1;
+    }
+  }
+
+  /* Now that the checking is taken care off, wipe this bastard of a file. */
+  _rsh_fat16_wipe_file(child);
+
+  /* We still have two things to do, clean out the child dirent, and remove the
+   * last index out of the FAT table. */
+  rsh_fat16_set_entry(child->index, FAT_FREE);
+  memset(child, 0, sizeof(struct rsh_fat_dirent));
+
+  return 0;
+
+}
+
+/*
  * Open a previously created FAT16 filesystem. Ugh this one is actually more
  * annoying that creating a new file system. Nvm, I take that back.
  */
@@ -1124,6 +1192,8 @@ struct rsh_io_ops fops = {
   .open =  rsh_fat16_open,
   .close = rsh_fat16_close,
   .readdir = rsh_fat16_readdir,
+  .mkdir = rsh_fat16_mkdir,
+  .unlink = rsh_fat16_unlink,
 
 };
 
@@ -1174,6 +1244,38 @@ int builtin_fatinfo(int argc, char **argv, int in, int out, int err){
 
   return 0;
 
+}
+
+/*
+ * Display usage stats for the file system.
+ */
+int builtin_df(int argc, char **argv, int in, int out, int err){
+
+  int i;
+  int clusters;
+  int used_clusters;
+  fat_t *fat_table = 
+    (fat_t *)FAT_CLUSTER_TO_ADDR(fat16_fs.fs_header.fat_offset);
+  float usage;
+
+  /* The total free clusters. */
+  clusters = fat16_fs.fs_header.len / fat16_fs.fs_header.csize;
+  
+  /* The total used clusters. */
+  for ( i = 0; i < fat16_fs.fat_entries; i++){
+    if ( fat_table[i] != FAT_FREE )
+      used_clusters++;
+  }
+
+  usage = (float)used_clusters/(float)clusters;
+  usage *= 100.0;
+
+  printf("Total bytes avaliable: %d\n", fat16_fs.fs_header.len);
+  printf("  Clusters used/avaliable: %d / %d\n", used_clusters, clusters);
+  printf("Usage: %.2lf%%\n", usage);
+
+  return 0;
+  
 }
 
 /*

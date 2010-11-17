@@ -5,6 +5,7 @@
  */
 
 #include <rsh.h>
+#include <rshio.h>
 #include <symbol_table.h>
 
 #include <pwd.h>
@@ -125,7 +126,7 @@ void _display_cwd(){
   char *dir;
 
   memset(buf, 0, 1024);
-  if ( ! getcwd(buf, 1023) )
+  if ( ! rsh_getcwd(buf, 1023) )
     return;
 
   if ( strcmp("/", buf) == 0 ){

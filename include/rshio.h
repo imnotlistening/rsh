@@ -24,11 +24,12 @@
 
 #include <rsh.h>
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 /*
  * This assumes two things: 1) native file descriptors are at least 16 bits
- * wide, and 2) that the shell will not use more than 32768 native file
+ * wide, and 2) that the shell will not use more than 32768/2 native file
  * descriptors (this seems fairly reasonable). 
  */
 #define _RSH_FD_OFFSET   0x8000
@@ -36,15 +37,21 @@
 #define _RSH_FD_TO_INDEX(fd) ( fd & ~_RSH_FD_OFFSET )
 
 /* Definitions for RSH's version of the necessary I/O sys calls. */
-ssize_t rsh_read(int fd, void *buf, size_t count);
-ssize_t rsh_write(int fd, const void *buf, size_t count);
-int     rsh_dup2(int oldfd, int newfd);
-int     rsh_open(const char *pathname, int flags, mode_t mode);
-int     rsh_close(int fd);
+ssize_t        rsh_read(int fd, void *buf, size_t count);
+ssize_t        rsh_write(int fd, const void *buf, size_t count);
+int            rsh_dup2(int oldfd, int newfd);
+int            rsh_open(const char *pathname, int flags, mode_t mode);
+int            rsh_close(int fd);
 struct dirent *rsh_readdir(int dfd);
-
+int            rsh_fstat(int fd, struct stat *buf);
+int            rsh_mkdir(const char *path, mode_t mode);
+int            rsh_unlink(const char *path);
+int            rsh_chdir(const char *path);
+char          *rsh_getcwd(char *buf, size_t size);
+ 
 /* Wrapper for the printf() function call that can use a descriptor. */
-int     rsh_dprintf(int fd, char *format, ...);
+int            rsh_dprintf(int fd, char *format, ...);
 
 /* Other things. */
-inline void rsh_fs(int where);
+inline void    rsh_fs(int where);
+int            rsh_native_path(const char *path);

@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 
 extern char *_rsh_fat16_split_path(char *path, char **name);
+void _rsh_fs_interpolate(char *path);
 extern int builtin_fatinfo(int argc, char **argv, int in, int out, int err);
 
 extern int rsh_fat16_open(struct rsh_file *file, 
@@ -49,7 +50,7 @@ int main(){
 
   /* Now, we need to start testing out actual file operations. First: path 
    * parsing. */
-  char *path = "/home/alex/blah/hello/derr";
+  //char *path = "/home/alex/blah/hello/derr";
   /*
   char *another_path = "/home/alex/c-programs/svn-programs/rsh/trunk/src";
   char *node;
@@ -64,21 +65,28 @@ int main(){
   while ( (node = _rsh_fat16_parse_path(&copy, &next, another_path)) != NULL)
     printf(" %s\n", node);
   */
-
   char *name;
-  char *a_path = "h/.";
-  a_path[0] = 'k';
+  char *a_path = strdup("/");
   char *a_dir = _rsh_fat16_split_path(a_path, &name);
   printf("dir='%s' name='%s'\n", a_dir, name);
   return 0;
-
+  
   /* Now we can traverse a path by looking at directory tables and stuff. */
+  /*
   struct rsh_fat_dirent ent;
   int errcode = _rsh_fat16_path_to_dirent(path, &ent, NULL);
   printf("Error returned: %d\n", errcode);
   if ( errcode < 0 ){
     perror("  _rsh_fat16_path_to_dirent");
   }
+  */
+  int errcode;
+  /* See if path reducing works. */
+  char *test_path = strdup("/home/..");
+  printf("nasty path: %s\n", test_path);
+  _rsh_fs_interpolate(test_path);
+  printf("reduced path: %s\n", test_path);
+  return 0;
 
   /* Lets try making a directory. */
   printf("MAKING A DIRECTORY\n");

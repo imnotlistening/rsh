@@ -25,6 +25,11 @@
 int native = 0;
 
 /*
+ * The name of the filesystem. Defined in fs.c.
+ */
+extern char *rsh_root;
+
+/*
  * printf() functionality for for a file descriptor.
  */
 int rsh_dprintf(int fd, char *format, ...){
@@ -58,17 +63,6 @@ inline void rsh_fs(int where){
 }
 
 /*
- * Return > 0 if the specified path is located on the native file system. If
- * the path is a relative path, then the path will be interpretted as native if
- * RSH is currently using the naitve file system as default or visa versa.
- */
-int rsh_path_location(char *path){
-
-  return 0;
-
-}
-
-/*
  * Set access to the native or built in file system.
  */
 int builtin_native(int argc, char **argv, int in, int out, int err){
@@ -82,6 +76,38 @@ int builtin_native(int argc, char **argv, int in, int out, int err){
   }
 
   return 0;
+
+}
+
+/*
+ * native_path: returns true if the string passed is a path on the native file
+ * system, false otherwise. This will not check to see if teh path exists, it
+ * simply looks at the format of the passed string and makes a determination.
+ * The way this works is as follows: if the path is not absolute, then the
+ * value of 'native' is returned, that is a relative path is going to exist on
+ * whatever file system is currently being used. If the path is absolute then
+ * the path is native, unless the path starts with /<fs_name>, in which case
+ * it is built in and must be translated to a absolute builtin path with the
+ * function rsh_abs_bifs_path().
+ */
+int rsh_native_path(const char *path){
+
+  if ( *path != '/' )
+    return native;
+
+  if ( strncmp(path, rsh_root, strlen(rsh_root)) )
+    return 1;
+  return 0;
+
+}
+
+/*
+ * Returns the subsection of the passed string that is absolute relative to the
+ * root of the built in file system. 
+ */
+char *rsh_builtin_path(char *path){
+
+  return path + strlen(rsh_root);
 
 }
 
@@ -124,10 +150,11 @@ int rsh_dup2(int oldfd, int newfd){
  */
 int rsh_open(const char *pathname, int flags, mode_t mode){
 
-  if ( native )
+  if ( rsh_native_path(pathname) ){
     return open(pathname, flags, mode);
-  else
+  } else {
     return _rsh_open(pathname, flags, mode);
+  }
 
 }
 
@@ -156,3 +183,64 @@ struct dirent *rsh_readdir(int dfd){
     return _rsh_readdir(dfd);
 
 }
+
+/*
+ * Wrapper for stat().
+ */
+int rsh_fstat(int fd, struct stat *buf){
+
+  if ( ! _RSH_FD(fd) )
+    return fstat(fd, buf);
+  else
+    return _rsh_fstat(fd, buf);
+
+}
+
+/*
+ * Wrapper for mkdir().
+ */ 
+int rsh_mkdir(const char *path, mode_t mode){
+
+  if ( native )
+    return mkdir(path, mode);
+  else
+    return _rsh_mkdir(path);
+
+}
+
+/*
+ * Wrapper for unlink().
+ */ 
+int rsh_unlink(const char *path){
+
+  if ( native )
+    return unlink(path);
+  else
+    return _rsh_unlink(path);
+
+}
+
+/*
+ * Wrapper for chdir().
+ */
+int rsh_chdir(const char *dir){
+
+  if ( native )
+    return chdir(dir);
+  else
+    return _rsh_chdir(dir);
+
+}
+
+/*
+ * Wrapper for getcwd().
+ */
+char *rsh_getcwd(char *buf, size_t size){
+
+  if ( native )
+    return getcwd(buf, size);
+  else
+    return _rsh_getcwd(buf, size);
+
+}
+

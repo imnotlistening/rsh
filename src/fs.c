@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #define FILES_BLOCK_INC 8
 #define DIRS_PER_READ   8
@@ -26,6 +28,7 @@
   }  while (0)
 
 #define FD_TO_FPTR(idx) ( &(fs.ftable[idx]) )
+#define FD_TO_FILE(fd)  ( fs.ftable[fd] )
 
 /*
  * Our file system data. Important stuff.
@@ -36,6 +39,7 @@ struct rsh_file_system fs;
  * Current working directory for the RSH FS.
  */
 char *rsh_cwd = "/";
+int rsh_cwd_alloc = 0;
 char *rsh_root;
 
 int rsh_init_fs(){
@@ -43,7 +47,7 @@ int rsh_init_fs(){
   struct rsh_file *files = (struct rsh_file *)
     malloc(sizeof(struct rsh_file) * FILES_BLOCK_INC );
 
-  if ( ! files ) 
+  if ( ! files )
     return RSH_ERR;
 
   fs.ftable = files;
@@ -62,12 +66,12 @@ int _rsh_increase_files(){
   struct rsh_file *files = (struct rsh_file *)
     malloc(sizeof(struct rsh_file) * ( fs.ft_length + FILES_BLOCK_INC) );
 
-  if ( ! files ) 
+  if ( ! files ){
     return RSH_ERR;
+  }
 
-  memset(fs.ftable, 0, 
+  memset(files, 0, 
 	 sizeof(struct rsh_file) * ( fs.ft_length + FILES_BLOCK_INC) );
-
   memcpy(files, fs.ftable, sizeof(struct rsh_file) * fs.ft_length );
   free(fs.ftable);
   fs.ftable = files;
@@ -109,6 +113,261 @@ int rsh_register_fs(struct rsh_io_ops *fops, char *name, void *driver){
   fs.driver = driver;
 
   return RSH_OK;
+
+}
+
+/*
+ * Parse a node out of a path. To parse out all nodes (and the leaf) use this
+ * function like so:
+ *
+ *   char *node;
+ *   char *path = ...; // The path string.
+ *   char *copy, *next;
+ *   while ( (node = _rsh_fs_parse_path(&copy, &next, path)) != NULL )
+ *     // Use node
+ *
+ * This function will assume that the passed path is an absolute path. If not
+ * then you will loose the first character in the first returned node. Just
+ * make sure you use an absolute path.
+ */
+char *_rsh_fs_parse_path(char **copy, char **next, const char *start){
+
+  char *end;
+  char *ret;
+
+  if ( ! *copy ){
+    *copy = strdup(start);
+    *next = *copy + 1; /* Dump the leading slash. */
+  }
+
+  /* Find the end of this node. */
+  //printf("--| remaining: <%s> (**next = %d)\n", *next, **next);
+  end = *next;
+  while ( *end != 0 ){
+    if ( *end == '/' )
+      break;
+    end++;
+  }
+
+  /* We are done. Cleanup our resources. */
+  if ( *next == end ){
+    free(*copy);
+    *next = NULL;
+    *copy = NULL;
+    //printf("<<fin>>\n");
+    return NULL;
+  }
+
+  /* Otherwise, return the node of interest. */
+  ret = *next;
+  if ( *end )
+    *next = end + 1;
+  else
+    *next = end; /* This will terminate the parse. */
+  *end = 0;
+
+  return ret;
+
+}
+
+/*
+ * Returns a new string to use for the absolute pathname of a file. This string
+ * must be free()'ed at some point.
+ */
+char *_rsh_fs_rel2abs(const char *path){
+
+  char *fs_name;
+
+  if ( path[0] == '/' ){
+    return strdup(path);
+  } else {
+    printf("<> Builing path string... ");
+    fs_name = (char *)malloc(strlen(rsh_cwd) + strlen(path) + 1);
+    memcpy(fs_name, rsh_cwd, strlen(rsh_cwd)+1);
+    printf("(%s) ", fs_name);
+    strcat(fs_name, path);
+    printf("%s\n", fs_name);
+    return fs_name;
+  }
+
+}
+
+/*
+ * Turn the pesky '..' and '.' file names into what they really mean. This can
+ * be done in place, thus the string you passed will get modified. It will be
+ * either exactly as long as it was to start with or shorter (think about it).
+ * This function *will not* work with a relative path.
+ */
+void _rsh_fs_interpolate(char *path){
+
+  char *node;
+  char *copy = NULL, *next;
+  char *rpath;
+  char *rpath_start = (char *)malloc(strlen(path));
+  memset(rpath_start, 0, strlen(path));
+  rpath = rpath_start;
+
+  while ( (node = _rsh_fs_parse_path(&copy, &next, path)) != NULL ){
+
+    /*
+     * There are three possibilities. Either the node is '.' in which case we
+     * just do nothing, or the node is '..' in which case we chop the last node
+     * of the rpath, or the node is neither '.' or '..' in which case we
+     * append the node to the rpath. Yeesh.
+     */
+    if ( strcmp(node, ".") == 0 )
+      continue;
+
+    if ( strcmp(node, "..") == 0 ){
+      
+      while ( *rpath != '/' ){
+	if ( rpath == rpath_start ) 
+	  break;
+	rpath--;
+      }
+
+      *rpath = 0; /* Null terminate. */
+
+    } else {
+      
+      strcat(rpath, "/");
+      strcat(rpath, node);
+      while ( *rpath++ != '/' );
+      rpath++;
+
+    }
+
+  }
+
+  /* We have removed all dots at this point. */
+  memcpy(path, rpath_start, strlen(rpath_start)+1);
+  free(rpath_start);
+
+  /* This happens if we end up at the root directory. Just put in /. */
+  if ( ! *path ){
+    *path++ = '/';
+    *path = 0;
+  }
+
+}
+
+int _rsh_chdir(const char *dir){
+
+  int fd;
+  int ret;
+  char *full_path, *tmp;
+  struct stat buf;
+
+  if ( *dir != '/' )
+    tmp = _rsh_fs_rel2abs(dir);
+  else
+    tmp = strdup(dir);
+
+  if ( ! tmp ){
+    errno = ENOMEM;
+    return RSH_ERR;
+  }
+
+  printf("tmp=%s\n", tmp);
+  _rsh_fs_interpolate(tmp);
+  printf("new tmp=%s\n", tmp);
+
+  full_path = (char *)malloc(strlen(tmp) + 2);
+  memcpy(full_path, tmp, strlen(tmp)+1);
+
+  printf("int full_path: %s\n", full_path);
+  if ( full_path[strlen(full_path)-1] != '/' ){
+    full_path[strlen(full_path)+1] = 0;
+    full_path[strlen(full_path)] = '/';
+  }
+  printf("new working derr: %s\n", full_path);
+
+  fd = _rsh_open(full_path, 0, 0);
+  if ( fd < 0 ){
+    ret = RSH_ERR;
+    goto cleanup;
+  }
+
+  ret = _rsh_fstat(fd, &buf);
+  if ( ret < 0 ){
+    ret = RSH_ERR;
+    goto cleanup;
+  }
+  rsh_close(fd);
+
+  if ( ! (buf.st_mode & S_IFDIR) ){
+    errno = ENOTDIR;
+    ret = RSH_ERR;
+    goto cleanup;
+  }
+
+  if ( rsh_cwd_alloc )
+    free(rsh_cwd);
+
+  rsh_cwd = full_path;
+  rsh_cwd_alloc = 1;
+
+  return RSH_OK;
+
+ cleanup:
+  free(full_path);
+  free(tmp);
+  return ret;
+
+}
+
+char *_rsh_getcwd(char *buf, size_t size){
+
+  char *_buf = NULL;
+
+  if ( ! size && buf ){
+    errno = EINVAL;
+    return NULL;    
+  }
+
+  if ( buf )
+    _buf = buf;
+  else
+    _buf = (char *)malloc(size);
+
+  if ( ! _buf ){
+    errno = ENOMEM;
+    return NULL;
+  }
+
+  if ( strlen(rsh_cwd) >= size ){
+    if ( ! buf )
+      free(_buf);
+    errno = ERANGE;
+    return NULL;
+  }
+
+  memcpy(_buf, rsh_cwd, size);
+  if ( _buf[strlen(_buf)-1] == '/' && strcmp(_buf, "/") != 0 )
+    _buf[strlen(_buf)-1] = 0;
+
+  return _buf;
+
+}
+
+extern int native;
+/*
+ * Return > 0 if the specified path is located on the native file system. If
+ * the path is a relative path, then the path will be interpretted as native if
+ * RSH is currently using the naitve file system as default or visa versa.
+ */
+int rsh_path_location(char *path){
+
+  /* Built in FS path. */
+  if ( strncmp(path, rsh_root, strlen(rsh_root)) == 0 )
+    return 0;
+  
+  /* Native path. */
+  if ( path[0] == '/' )
+    return 1;
+  
+  /* If the path is relative, it will be relative to the current FS. */
+  return native;
 
 }
 
@@ -179,42 +438,41 @@ int _rsh_open(const char *pathname, int flags, mode_t mode){
   LOCATE_FILE(fd, file);
 
   /* This would be a bug... */
-  if ( ! file )
+  if ( ! file ){
+    printf("FS bug detected.\n");
     return RSH_ERR;
-
-  /* Now for some real fun (not). Make sure the path that is passed is an
-   * absolute path, if it isn't, concatentate it with the CWD for the built in
-   * FS. */
-  if ( pathname[0] == '/' ){
-    fs_name = (char *)pathname;
-  } else {
-    fs_name = (char *)malloc(strlen(rsh_cwd) + strlen(pathname) + 1);
-    memcpy(fs_name, rsh_cwd, strlen(rsh_cwd));
-    strcat(fs_name, pathname);
   }
+
+  fs_name = _rsh_fs_rel2abs(pathname);
+  printf("<> Opening: %s\n", fs_name);
 
   /* Fill out this file struct and pass it on to the FS driver. */
   memset(file, 0, sizeof(struct rsh_file));
   file->used = 1;
   file->references = 1;
   file->offset = 0;
-  file->path = strdup(fs_name);
+  file->path = fs_name;
   file->fops = fs.fops;
-  free(fs_name);
 
   if ( fs.fops->open )
     err = fs.fops->open(file, file->path, flags);
   else
     err = 0;
 
-  if ( ! err )
+  if ( ! err ){
+    fs.used++;
     return fd | _RSH_FD_OFFSET;
-  else
+  } else {
+    file->used = 0;
+    free(file->path);
     return err;
+  }
 
 }
 
 int _rsh_close(int fd){
+
+  int ret;
 
   if ( ! _RSH_FD(fd) ){
     errno = EBADF;
@@ -233,10 +491,14 @@ int _rsh_close(int fd){
 
   if ( fs.ftable[fd].references == 0 ){
     fs.ftable[fd].used = 0;
-    if ( fs.fops->close )
-      return fs.fops->close(FD_TO_FPTR(fd));
-    else
+    fs.used--;
+    if ( fs.fops->close ){
+      ret = fs.fops->close(FD_TO_FPTR(fd));
+      free(FD_TO_FILE(fd).path);
+      return ret;
+    } else {
       return RSH_OK;
+    }
   } else {
     return RSH_OK;
   }
@@ -318,5 +580,86 @@ struct dirent *_rsh_readdir(int dfd){
   dirs_len = 0;
   almost_done = 0;
   return NULL;
+
+}
+
+int _rsh_fstat(int fd, struct stat *buf){
+
+  if ( ! _RSH_FD(fd) ){
+    errno = EBADF;
+    return RSH_ERR;
+  }
+  fd = _RSH_FD_TO_INDEX(fd);
+
+  if ( ! fs.ftable[fd].used ){
+    errno = EBADF;
+    return RSH_ERR;
+  }
+
+  printf("  Filling stat in info for: (%d) %s\n", fd, FD_TO_FILE(fd).path);
+
+  /* Fill in the relevant data fields. */
+  buf->st_dev = 0;                 /* No dev ID since we are in userspace. */
+  buf->st_ino = 0;                 /* Same idea, were in user space. */
+  buf->st_mode = FD_TO_FILE(fd).mode;
+  buf->st_nlink = 1;
+  buf->st_uid = getuid();
+  buf->st_gid = getgid();
+  buf->st_rdev = 0;                /* No special files. */
+  buf->st_size = FD_TO_FILE(fd).size;
+  buf->st_blksize = FD_TO_FILE(fd).block_size;
+  buf->st_blocks = FD_TO_FILE(fd).blocks;
+  buf->st_atime = buf->st_mtime =  0; /* Not kept track of. */
+  buf->st_ctime = FD_TO_FILE(fd).access_time;
+
+  return RSH_OK;
+
+}
+
+int _rsh_mkdir(const char *path){
+
+  char *fs_name = _rsh_fs_rel2abs(path);
+
+  printf("Making dir: %s\n", fs_name);
+
+  if ( fs.fops->mkdir ){
+    return fs.fops->mkdir(fs_name);
+  } else {
+    errno = EPERM;
+    return RSH_ERR;
+  }
+
+}
+
+int _rsh_unlink(const char *path){
+
+  char *fs_name = _rsh_fs_rel2abs(path);
+  printf("Deleting %s\n", fs_name);
+
+  if ( fs.fops->unlink )
+    return fs.fops->unlink(fs_name);
+  else
+    return 0;
+
+}
+
+int builtin_dumpfds(int argc, char **argv, int in, int out, int err){
+
+  int i;
+
+  for ( i = 0; i < fs.ft_length; i++){
+
+    if ( ! fs.ftable[i].used )
+      continue;
+    
+    printf("FD: %d\n", i);
+    printf("  references: %d\n", (int)fs.ftable[i].references);
+    printf("  offset:     %d\n", (int)fs.ftable[i].offset);
+    printf("  path:       %s\n", fs.ftable[i].path);
+    printf("  size:       %d\n", (int)fs.ftable[i].size);
+
+  }
+
+  return 0;
 
 }

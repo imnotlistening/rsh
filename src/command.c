@@ -392,9 +392,9 @@ int set_stdin(char *file){
   int fd;
 
   /* First try to open the file. */
-  fd = open(file, O_RDONLY);
+  fd = rsh_open(file, O_RDONLY, 0);
   if ( fd < 0 ){
-    perror("open()");
+    perror("rsh_open()");
     return RSH_ERR;
   }
 
@@ -417,9 +417,9 @@ int set_stdout(char *file, int append){
   if ( append )
     flags |= O_APPEND;
 
-  fd = open(file, flags, mode);
+  fd = rsh_open(file, flags, mode);
   if ( fd < 0 ){
-    perror("open()");
+    perror("rsh_open()");
     return RSH_ERR;
   }
 
@@ -441,9 +441,9 @@ int set_stderr(char *file, int append){
   if ( append )
     flags |= O_APPEND;
 
-  fd = open(file, flags, mode);
+  fd = rsh_open(file, flags, mode);
   if ( fd < 0 ){
-    perror("open()");
+    perror("rsh_open()");
     return RSH_ERR;
   }
 

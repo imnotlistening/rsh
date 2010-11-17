@@ -2,46 +2,54 @@
  * RSH file system implementation. Yikes. Basically a FAT16 FS under the hood.
  * The useful syscalls that are used for a normal file system are implemented
  * in userspace for us. These "sys" calls are: read(), write(), dup2(), open(),
- * close(). 
+ * close(), etc. 
  */
 
 #include <rsh.h>
 
 #include <stdint.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 /* These are the under the hood operations for the file system. These are
  * correlated to the equivalent POSIX standard calls. */
-ssize_t _rsh_read(int fd, void *buf, size_t count);
-ssize_t _rsh_write(int fd, const void *buf, size_t count);
-int     _rsh_dup2(int oldfd, int newfd);
-int     _rsh_open(const char *pathname, int flags, mode_t mode);
-int     _rsh_close(int fd);
+ssize_t        _rsh_read(int fd, void *buf, size_t count);
+ssize_t        _rsh_write(int fd, const void *buf, size_t count);
+int            _rsh_dup2(int oldfd, int newfd);
+int            _rsh_open(const char *pathname, int flags, mode_t mode);
+int            _rsh_close(int fd);
 struct dirent *_rsh_readdir(int dfd);
+int            _rsh_fstat(int fd, struct stat *buf);
+int            _rsh_mkdir(const char *path);
+int            _rsh_unlink(const char *path);
+int            _rsh_chdir(const char *path);
+char          *_rsh_fs_parse_path(char **copy, char **next, const char *start);
+char          *_rsh_getcwd(char *buf, size_t size);
 
 /*
  * A structure for representing a file.
  */
 struct rsh_file {
 
-  /* Set to zero if this file structure is not in use. */
-  int used;
-
-  /* Reference count. If this hits 0, close this file. */
-  int references;
-
-  /* Offset into the file, self explanitory. */
-  off_t offset;
-
-  /* Store the path of the file. */
-  const char *path;
+  /* Basic FS related information. */
+  int                used;
+  int                references;
+  off_t              offset;
+  char              *path;
 
   /* The operations structure so we know how to actually use the file. */
   struct rsh_io_ops *fops;
 
+  /* Info that we need to describe the file to the FS. */
+  mode_t             mode;
+  off_t              size;
+  long int           block_size;
+  long int           blocks;
+  time_t             access_time;
+
   /* A pointer into the underlying file systems data to describe the file. */
-  void *local;
+  void              *local;
 
 };
 
@@ -74,6 +82,8 @@ struct rsh_io_ops {
   int     (*open)(struct rsh_file *file, const char *pathname, int flags);
   int     (*close)(struct rsh_file *file);
   int     (*readdir)(struct rsh_file *file, void *buf, size_t space);
+  int     (*mkdir)(const char *path);
+  int     (*unlink)(const char *path);
 
 };
 

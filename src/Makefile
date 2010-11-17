@@ -7,7 +7,7 @@ LD       = gcc          # Makes life easier :).
 CFLAGS   = -Wall -ggdb 
 CPPFLAGS = -I../include #-D_HAVE_GNU_READLINE
 LDFLAGS  =
-LIBS     = -L../libs -lreadline -lhistory
+LIBS     = -lm
 
 OBJECTS  = lexxer.o shell_start.o parser.o shellcore.o symbol_table.o exec.o \
 		command.o readterm.o prompt.o builtin.o source.o fs.o \
@@ -51,16 +51,16 @@ rsh: $(OBJECTS) main.c
 	$(CC) -o rsh main.c $(OBJECTS) $(LIBS)
 
 exectest: $(OBJECTS) exectest.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o exectest exectest.c $(OBJECTS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o exectest exectest.c $(OBJECTS) $(LIBS)
 
 symtest: $(OBJECTS) symtest.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o symtest symtest.c $(OBJECTS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o symtest symtest.c $(OBJECTS) $(LIBS)
 
 more_tests: $(OBJECTS) more_tests.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o more_tests more_tests.c $(OBJECTS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o mtests more_tests.c $(OBJECTS) $(LIBS)
 
 termtest: $(OBJECTS) termtest.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o termtest termtest.c $(OBJECTS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o termtest termtest.c $(OBJECTS) $(LIBS)
 
 ### Cleaning targets.
 
