@@ -612,6 +612,10 @@ int _do_copy(char *source, char *dest){
       return RSH_ERR;
     }
   } else {
+    if ( *dest == '/' ){
+      dest++;
+      while ( *dest++ != '/' );
+    }
     tmpfd = rsh_open(dest, 0, 0);
     if ( tmpfd < 0 ){
       perror("rsh_open");

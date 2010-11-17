@@ -37,7 +37,7 @@ char *shell_name;
 char *bifs = "builtin_fs.img";
 
 /* Stuff specific to the FAT16 used. */
-long int geometry[2] = { 1024*1024, 1024 };
+long int geometry[2] = { 5*1024*1024, 8*1024 };
 int override = 0; /* If set, override the limits imposed. */
 extern int _rsh_fat16_geometry(char *geometry, long int *geo);
 
@@ -115,8 +115,8 @@ int rsh_parse_args(int argc, char **argv){
       if ( _rsh_fat16_geometry(optarg, geometry) ){
 	fprintf(stderr, "Warning: unable to parse geometry.\n");
 	/* Go back to default I guess. */
-	geometry[0] = 1024*1024;
-	geometry[1] = 1024;
+	geometry[0] = 5*1024*1024;
+	geometry[1] = 8*1024;
       }
       break;
     case 'o':
@@ -206,7 +206,8 @@ void rsh_init(){
 
   if ( geometry[0] < (5 * 1024*1024) || geometry[0] > (50 * 1024*1024) ){
     if ( ! override ){
-      printf("Disk size must be between 5 and 50 Megabytes.\n");
+      printf("Disk size must be between 5 and 50 Megabytes."
+	     " %d not acceptable\n", geometry[0]);
       printf(
 	"Specify --override to force a disk size outside of these limits.\n");
       exit(1);
